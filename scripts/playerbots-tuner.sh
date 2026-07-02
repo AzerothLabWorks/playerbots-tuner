@@ -45,6 +45,7 @@ Commands:
   diagnose-lfg            Show LFG-related config and recent worldserver logs.
   diagnose-pvp            Show PvP-related config and recent worldserver logs.
   print-macros            Print useful in-game Playerbots party commands.
+  restore-latest          Restore latest tuner backups for config/compose files.
   restart                 Restart ac-worldserver.
   rebuild                 Rebuild and restart ac-worldserver.
 
@@ -59,6 +60,7 @@ Examples:
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset solo-controller --restart
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --bots 1000 --dry-run
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches lfg --rebuild
+  ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots restore-latest --restart
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots doctor
 USAGE
 }
@@ -85,6 +87,8 @@ run_cmd() {
 }
 
 parse_args() {
+  COMMAND_ARGS=()
+
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --server-dir) SERVER_DIR="${2:-}"; shift 2 ;;
@@ -98,17 +102,21 @@ parse_args() {
       --max-level) MAX_LEVEL="${2:-}"; shift 2 ;;
       --follow-distance) FOLLOW_DISTANCE="${2:-}"; shift 2 ;;
       -h|--help) usage; exit 0 ;;
-      list-presets|apply-preset|apply-patches|doctor|diagnose-lfg|diagnose-pvp|print-macros|restart|rebuild)
+      list-presets|apply-preset|apply-patches|doctor|diagnose-lfg|diagnose-pvp|print-macros|restore-latest|restart|rebuild)
+        [[ -z "$COMMAND" ]] || die "Only one command can be used at a time."
         COMMAND="$1"
         shift
-        COMMAND_ARGS=("$@")
-        return 0
         ;;
-      *) die "Unknown option or command: $1" ;;
+      *)
+        if [[ -n "$COMMAND" ]]; then
+          COMMAND_ARGS+=("$1")
+          shift
+        else
+          die "Unknown option or command: $1"
+        fi
+        ;;
     esac
   done
-
-  COMMAND_ARGS=()
 }
 
 require_server_dir() {
@@ -199,6 +207,57 @@ backup_file_once() {
     cp "$file" "$backup"
   fi
   BACKED_UP_FILES="$BACKED_UP_FILES $file"
+}
+
+latest_backup_for() {
+  local file="$1"
+  local latest=""
+
+  shopt -s nullglob
+  local backups=("${file}".bak.*)
+  shopt -u nullglob
+
+  [[ ${#backups[@]} -gt 0 ]] || return 1
+  latest="$(ls -t "${backups[@]}" 2>/dev/null | head -1 || true)"
+  [[ -n "$latest" ]] || return 1
+  printf '%s\n' "$latest"
+}
+
+find_latest_config_backup() {
+  local config
+  config="$(find_playerbots_config || true)"
+  if [[ -n "$config" ]] && latest_backup_for "$config" >/dev/null 2>&1; then
+    latest_backup_for "$config"
+    return 0
+  fi
+
+  shopt -s nullglob
+  local backups=(
+    "$SERVER_DIR"/env/dist/etc/modules/playerbots.conf.bak.*
+    "$SERVER_DIR"/etc/modules/playerbots.conf.bak.*
+    "$SERVER_DIR"/configs/modules/playerbots.conf.bak.*
+    "$SERVER_DIR"/modules/mod-playerbots/conf/playerbots.conf.bak.*
+  )
+  shopt -u nullglob
+
+  [[ ${#backups[@]} -gt 0 ]] || return 1
+  ls -t "${backups[@]}" 2>/dev/null | head -1
+}
+
+restore_backup_file() {
+  local backup="$1"
+  local target="${backup%.bak.*}"
+
+  [[ -f "$backup" ]] || die "Backup file does not exist: $backup"
+  confirm_or_die "Restore $backup to $target?"
+
+  if [[ "$DRY_RUN" == "1" ]]; then
+    printf '[dry-run] cp %q %q\n' "$backup" "$target"
+    log "Would restore $target from $(basename "$backup")."
+  else
+    cp "$backup" "$target"
+    log "Restored $target from $(basename "$backup")."
+  fi
 }
 
 set_conf_value() {
@@ -573,6 +632,40 @@ Gameplay notes:
 NOTE
 }
 
+restore_latest() {
+  require_server_dir
+
+  local restored=0
+  local config_backup=""
+  local override=""
+  local override_backup=""
+
+  config_backup="$(find_latest_config_backup || true)"
+  if [[ -n "$config_backup" ]]; then
+    restore_backup_file "$config_backup"
+    restored=1
+  else
+    warn "No playerbots.conf backup found."
+  fi
+
+  override="$(compose_override_file)"
+  override_backup="$(latest_backup_for "$override" || true)"
+  if [[ -n "$override_backup" ]]; then
+    restore_backup_file "$override_backup"
+    restored=1
+  else
+    warn "No docker-compose.override.yml backup found."
+  fi
+
+  [[ "$restored" == "1" ]] || die "No restorable backups were found in $SERVER_DIR."
+
+  if [[ "$RESTART" == "1" ]]; then
+    restart_worldserver
+  else
+    log "Restart ac-worldserver for restored config changes to take effect."
+  fi
+}
+
 diagnose_lfg() {
   require_server_dir
   local config
@@ -675,6 +768,7 @@ main() {
     diagnose-lfg) diagnose_lfg ;;
     diagnose-pvp) diagnose_pvp ;;
     print-macros) print_macros ;;
+    restore-latest) restore_latest ;;
     restart) restart_worldserver ;;
     rebuild) rebuild_worldserver ;;
     *) die "Unknown command: $COMMAND" ;;
