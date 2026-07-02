@@ -1,8 +1,24 @@
-# Useful In-Game Commands
+# Useful In-Game Bot Commands
 
-These commands can be typed in party chat. Party chat commands apply to bots in
-the party. Whisper the same command to one bot when you only want one bot to obey
-it.
+Playerbots respond to in-game chat commands. Type these commands inside the WoW
+client chat box while logged into your character.
+
+Command target:
+
+- `/p command` sends the command to bots in your party.
+- `/r command` sends the command to bots in your raid.
+- `/w BotName command` sends the command to one specific bot.
+- GM-style `.playerbots ...` commands are typed in chat and require the correct
+  server permissions.
+
+Examples:
+
+```text
+/p follow
+/p stay
+/w Somebot follow
+/w Somebot stay
+```
 
 ## Recover Follow
 
@@ -47,3 +63,37 @@ using an item, or waiting for an event phase.
 ```
 
 Resets bot states, orders, and loot list.
+
+## Attack And Recovery
+
+```text
+/p attack
+/p flee
+/p summon
+/p release
+/p revive
+```
+
+Common use:
+
+- `attack` tells bots to attack your selected target.
+- `flee` calls bots back toward you while trying to ignore distractions.
+- `summon` asks bots to summon/teleport to you when supported by config.
+- `release` and `revive` help recover after deaths and wipes.
+
+## Targeting Bot Subsets
+
+Some commands can target roles, groups, or classes:
+
+```text
+/p @tank follow
+/p @heal stay
+/p @dps attack
+/p @group1 follow
+```
+
+For the full command reference, see:
+
+```text
+https://github.com/mod-playerbots/mod-playerbots/wiki/Playerbot-Commands
+```

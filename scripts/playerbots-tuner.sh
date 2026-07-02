@@ -726,7 +726,18 @@ diagnose_pvp() {
 
 print_macros() {
   cat <<'MACROS'
-Useful Playerbots party commands:
+Useful Playerbots in-game commands:
+
+Type these inside the WoW client chat box, not in the Linux terminal.
+
+/p command
+  Sends a command to bots in your party.
+
+/r command
+  Sends a command to bots in your raid.
+
+/w BotName command
+  Sends a command to one specific bot.
 
 /p follow
   Re-assert follow after death, resurrection, summon, or pathing drift.
@@ -743,15 +754,32 @@ Useful Playerbots party commands:
 /p follow info
   Ask bots to report follow settings.
 
+/p attack
+  Command bots to attack your selected target.
+
+/p flee
+  Call bots back toward you while trying to ignore distractions.
+
+/p summon
+  Ask bots to summon/teleport to you when supported by config.
+
+/p release
+/p revive
+  Recover after deaths or wipes.
+
 /p orders delay 5
   Make bots wait before engaging, useful when a quest needs controlled damage.
 
 /p reset
   Reset bot states, orders, and loot list.
 
+/p @tank follow
+/p @heal stay
+/p @dps attack
+  Target a role subset instead of the whole party.
+
 Tip:
-  Party chat commands apply to bots in the party. Whisper the same command to one bot
-  when you only want a specific bot to obey it.
+  Whisper a command to one bot when you only want that specific bot to obey it.
 MACROS
 }
 

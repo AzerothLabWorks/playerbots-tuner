@@ -436,6 +436,105 @@ If Docker is not installed or not running on the Steam Deck, you can still use
 the tuner to edit config files, but `--restart`, `--rebuild`, and log diagnostics
 will not work until Docker Compose is available.
 
+## In-Game Bot Commands
+
+Playerbots respond to in-game chat commands. You do not run these commands in
+the Linux terminal. Run them inside the WoW client chat box while logged into
+your character.
+
+The command target depends on where you type it:
+
+- `/p command` sends the command to bots in your party.
+- `/r command` sends the command to bots in your raid.
+- `/w BotName command` sends the command to one specific bot.
+- GM-style `.playerbots ...` commands are typed in chat and require the correct
+  server permissions.
+
+Examples:
+
+```text
+/p follow
+/p stay
+/w Somebot follow
+/w Somebot stay
+```
+
+The most useful starter commands are:
+
+```text
+/p follow
+```
+
+Re-asserts follow for party bots. This is useful after death, resurrection,
+summon, teleport, pathing drift, or a relog/reinvite situation.
+
+```text
+/p stay
+```
+
+Makes party bots hold their current position. This is useful when a quest needs
+you to use an item, tag a target, wait for an event, or avoid instantly killing
+everything nearby.
+
+```text
+/p attack
+```
+
+Commands bots to attack your selected target.
+
+```text
+/p flee
+```
+
+Calls bots back toward you while trying to ignore other distractions.
+
+```text
+/p summon
+```
+
+Asks bots to summon/teleport to you when supported by your Playerbots config.
+
+```text
+/p release
+/p revive
+```
+
+Useful after wipes or deaths near a spirit healer.
+
+```text
+/p reset
+```
+
+Resets bot actions and state. This can help if bots get stuck trying to cast,
+move, loot, or follow an old order.
+
+```text
+/p follow near
+/p follow far
+/p follow info
+```
+
+Adjusts or checks follow spacing.
+
+```text
+/p orders delay 5
+```
+
+Makes bots wait before engaging. This can help with quests that need controlled
+damage or setup time.
+
+Some commands can target subsets of bots. For example:
+
+```text
+/p @tank follow
+/p @heal stay
+/p @dps attack
+/p @group1 follow
+```
+
+The full upstream command reference is available in the
+[mod-playerbots Playerbot Commands wiki](https://github.com/mod-playerbots/mod-playerbots/wiki/Playerbot-Commands).
+
 ## Player Feedback Notes
 
 Repeated voice lines/greetings are handled by the quiet presets:
