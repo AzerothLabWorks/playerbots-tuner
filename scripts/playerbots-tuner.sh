@@ -12,6 +12,9 @@ RESTART=0
 REBUILD=0
 SKIP_COMPOSE=0
 BOT_COUNT=""
+MIN_BOTS=""
+MAX_BOTS=""
+POPULATION=""
 MIN_LEVEL=""
 MAX_LEVEL=""
 FOLLOW_DISTANCE=""
@@ -31,7 +34,10 @@ Options:
   --restart               Restart ac-worldserver after config changes.
   --rebuild               Rebuild and restart ac-worldserver after patch changes.
   --skip-compose          Do not update docker-compose.override.yml environment values.
-  --bots N                Override preset random bot count.
+  --population NAME       Use a bot count size: tiny, low, medium, high, very-high.
+  --bots N                Set min and max random bot count to the same value.
+  --min-bots N            Override minimum online random bot count.
+  --max-bots N            Override maximum online random bot count.
   --min-level N           Override preset random bot minimum level.
   --max-level N           Override preset random bot maximum level.
   --follow-distance N     Override preset follow distance in yards.
@@ -39,6 +45,7 @@ Options:
 
 Commands:
   list-presets            Show available presets.
+  list-populations        Show named bot population sizes.
   apply-preset NAME       Apply a config preset.
   apply-patches lfg       Apply optional Playerbots LFG reliability patches.
   doctor                  Check install layout and important Playerbots settings.
@@ -59,6 +66,9 @@ Presets:
 Examples:
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset solo-controller --restart
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --bots 1000 --dry-run
+  ./scripts/playerbots-tuner.sh list-populations
+  ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --population low --dry-run
+  ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --min-bots 300 --max-bots 900
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches lfg --rebuild
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots restore-latest --restart
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots doctor
@@ -98,11 +108,14 @@ parse_args() {
       --rebuild) REBUILD=1; shift ;;
       --skip-compose) SKIP_COMPOSE=1; shift ;;
       --bots) BOT_COUNT="${2:-}"; shift 2 ;;
+      --min-bots) MIN_BOTS="${2:-}"; shift 2 ;;
+      --max-bots) MAX_BOTS="${2:-}"; shift 2 ;;
+      --population) POPULATION="${2:-}"; shift 2 ;;
       --min-level) MIN_LEVEL="${2:-}"; shift 2 ;;
       --max-level) MAX_LEVEL="${2:-}"; shift 2 ;;
       --follow-distance) FOLLOW_DISTANCE="${2:-}"; shift 2 ;;
       -h|--help) usage; exit 0 ;;
-      list-presets|apply-preset|apply-patches|doctor|diagnose-lfg|diagnose-pvp|print-macros|restore-latest|restart|rebuild)
+      list-presets|list-populations|apply-preset|apply-patches|doctor|diagnose-lfg|diagnose-pvp|print-macros|restore-latest|restart|rebuild)
         [[ -z "$COMMAND" ]] || die "Only one command can be used at a time."
         COMMAND="$1"
         shift
@@ -260,6 +273,59 @@ restore_backup_file() {
   fi
 }
 
+require_non_negative_integer() {
+  local label="$1"
+  local value="$2"
+
+  [[ "$value" =~ ^[0-9]+$ ]] || die "$label must be a non-negative integer: $value"
+}
+
+population_bot_count() {
+  local population="$1"
+  case "$population" in
+    tiny) printf '100\n' ;;
+    low) printf '300\n' ;;
+    medium) printf '800\n' ;;
+    high) printf '1500\n' ;;
+    very-high) printf '2500\n' ;;
+    *) die "Unknown population: $population. Use tiny, low, medium, high, or very-high." ;;
+  esac
+}
+
+resolve_bot_counts() {
+  local default_min="$1"
+  local default_max="$2"
+  local min_bots="$default_min"
+  local max_bots="$default_max"
+
+  if [[ -n "$POPULATION" ]]; then
+    min_bots="$(population_bot_count "$POPULATION")"
+    max_bots="$min_bots"
+  fi
+
+  if [[ -n "$BOT_COUNT" ]]; then
+    require_non_negative_integer "--bots" "$BOT_COUNT"
+    min_bots="$BOT_COUNT"
+    max_bots="$BOT_COUNT"
+  fi
+
+  if [[ -n "$MIN_BOTS" ]]; then
+    require_non_negative_integer "--min-bots" "$MIN_BOTS"
+    min_bots="$MIN_BOTS"
+  fi
+
+  if [[ -n "$MAX_BOTS" ]]; then
+    require_non_negative_integer "--max-bots" "$MAX_BOTS"
+    max_bots="$MAX_BOTS"
+  fi
+
+  if (( min_bots > max_bots )); then
+    die "--min-bots cannot be greater than --max-bots: $min_bots > $max_bots"
+  fi
+
+  printf '%s %s\n' "$min_bots" "$max_bots"
+}
+
 set_conf_value() {
   local file="$1"
   local key="$2"
@@ -374,15 +440,20 @@ apply_quiet_social() {
 
 apply_solo_controller() {
   local config="$1"
-  local bots="${BOT_COUNT:-500}"
+  local bot_counts
+  local min_bots
+  local max_bots
   local min_level="${MIN_LEVEL:-1}"
   local max_level="${MAX_LEVEL:-80}"
   local follow_distance="${FOLLOW_DISTANCE:-2.5}"
 
+  bot_counts="$(resolve_bot_counts 500 500)"
+  read -r min_bots max_bots <<<"$bot_counts"
+
   apply_quiet_social "$config"
   set_playerbot_value "$config" "AiPlayerbot.RandomBotAutologin" "1"
-  set_playerbot_value "$config" "AiPlayerbot.MinRandomBots" "$bots"
-  set_playerbot_value "$config" "AiPlayerbot.MaxRandomBots" "$bots"
+  set_playerbot_value "$config" "AiPlayerbot.MinRandomBots" "$min_bots"
+  set_playerbot_value "$config" "AiPlayerbot.MaxRandomBots" "$max_bots"
   set_playerbot_value "$config" "AiPlayerbot.RandomBotAccountCount" "0"
   set_playerbot_value "$config" "AiPlayerbot.RandomBotMinLevel" "$min_level"
   set_playerbot_value "$config" "AiPlayerbot.RandomBotMaxLevel" "$max_level"
@@ -398,8 +469,8 @@ apply_solo_controller() {
   set_playerbot_value "$config" "AiPlayerbot.AutoPartyBuffs" "2"
 
   set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTOLOGIN" "1"
-  set_playerbot_env "AC_AI_PLAYERBOT_MIN_RANDOM_BOTS" "$bots"
-  set_playerbot_env "AC_AI_PLAYERBOT_MAX_RANDOM_BOTS" "$bots"
+  set_playerbot_env "AC_AI_PLAYERBOT_MIN_RANDOM_BOTS" "$min_bots"
+  set_playerbot_env "AC_AI_PLAYERBOT_MAX_RANDOM_BOTS" "$max_bots"
   set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_MIN_LEVEL" "$min_level"
   set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_MAX_LEVEL" "$max_level"
   set_playerbot_env "AC_AI_PLAYERBOT_SYNC_LEVEL_WITH_PLAYERS" "1"
@@ -439,12 +510,17 @@ apply_role_bias() {
 
 apply_dungeon_lfg() {
   local config="$1"
-  local bots="${BOT_COUNT:-1500}"
+  local bot_counts
+  local min_bots
+  local max_bots
   local min_level="${MIN_LEVEL:-15}"
   local max_level="${MAX_LEVEL:-80}"
   local follow_distance="${FOLLOW_DISTANCE:-2.5}"
 
-  BOT_COUNT="$bots" MIN_LEVEL="$min_level" MAX_LEVEL="$max_level" FOLLOW_DISTANCE="$follow_distance" apply_solo_controller "$config"
+  bot_counts="$(resolve_bot_counts 1500 1500)"
+  read -r min_bots max_bots <<<"$bot_counts"
+
+  MIN_BOTS="$min_bots" MAX_BOTS="$max_bots" MIN_LEVEL="$min_level" MAX_LEVEL="$max_level" FOLLOW_DISTANCE="$follow_distance" apply_solo_controller "$config"
   set_playerbot_value "$config" "AiPlayerbot.RandomBotJoinLfg" "1"
   set_playerbot_value "$config" "AiPlayerbot.ApplyInstanceStrategies" "1"
   set_playerbot_value "$config" "AiPlayerbot.SummonWhenGroup" "1"
@@ -484,6 +560,16 @@ dungeon-lfg      Leveling dungeon density, LFG participation, role-biased specs.
 pvp-3v3          Conservative level-80 rated 3v3 seeding.
 living-server    Dungeon + PvP + world social defaults.
 PRESETS
+}
+
+list_populations() {
+  cat <<'POPULATIONS'
+tiny       100   Basic testing and very low-resource systems.
+low        300   Steam Deck, small private servers, and older CPUs.
+medium     800   General use on modest desktop/server hardware.
+high       1500  Azeroth Lab Works dungeon-density baseline.
+very-high  2500  Strong hosts only; test carefully.
+POPULATIONS
 }
 
 apply_preset() {
@@ -790,6 +876,7 @@ main() {
 
   case "$COMMAND" in
     list-presets) list_presets ;;
+    list-populations) list_populations ;;
     apply-preset) apply_preset "${COMMAND_ARGS[@]}" ;;
     apply-patches) apply_patches "${COMMAND_ARGS[@]}" ;;
     doctor) doctor ;;

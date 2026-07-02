@@ -254,6 +254,18 @@ If you want fewer bots than the default dungeon preset:
 ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --bots 800 --restart
 ```
 
+You can also choose a named population size:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --population low --restart
+```
+
+Or set separate minimum and maximum online random bot counts:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --min-bots 300 --max-bots 900 --restart
+```
+
 ## Step 7: Optional LFG Reliability Patches
 
 Config presets only require a worldserver restart. The optional LFG reliability
@@ -312,6 +324,76 @@ Show presets:
 ```bash
 ./scripts/playerbots-tuner.sh list-presets
 ```
+
+Show population sizes:
+
+```bash
+./scripts/playerbots-tuner.sh list-populations
+```
+
+## Bot Population And Performance
+
+Random bot count has a direct effect on CPU, memory, database activity, and
+worldserver startup time. More bots can make the world feel alive and improve
+queue density, but lower-powered systems may need a smaller population.
+
+The tuner supports three ways to control bot count:
+
+```bash
+--population tiny|low|medium|high|very-high
+--bots N
+--min-bots N --max-bots N
+```
+
+Named population sizes:
+
+| Population | Bot Count | Suggested Use |
+|---|---:|---|
+| `tiny` | 100 | Basic testing, very low-resource systems |
+| `low` | 300 | Steam Deck, small private servers, older CPUs |
+| `medium` | 800 | General use on modest desktop/server hardware |
+| `high` | 1500 | Azeroth Lab Works dungeon-density baseline |
+| `very-high` | 2500 | Strong hosts only; test carefully |
+
+Simple exact count:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --bots 500 --restart
+```
+
+Separate minimum and maximum:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --min-bots 300 --max-bots 900 --restart
+```
+
+If you are not sure where to start:
+
+- Steam Deck or low-end host: start with `--population low`
+- Average desktop/server: start with `--population medium`
+- Dungeon/LFG-focused server with good resources: try `--population high`
+
+Always test with `--dry-run` first:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots --dry-run apply-preset dungeon-lfg --population low
+```
+
+The script writes both:
+
+```ini
+AiPlayerbot.MinRandomBots = N
+AiPlayerbot.MaxRandomBots = N
+```
+
+and Docker Compose environment overrides:
+
+```yaml
+AC_AI_PLAYERBOT_MIN_RANDOM_BOTS: "N"
+AC_AI_PLAYERBOT_MAX_RANDOM_BOTS: "N"
+```
+
+unless you use `--skip-compose`.
 
 ## Useful Commands
 
