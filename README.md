@@ -197,6 +197,29 @@ If your server is somewhere else, change the path:
 notes about common gameplay behavior such as greetings, follow recovery, and
 random bot party persistence.
 
+For a deeper compatibility check against your installed Playerbots version:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots compat-check
+```
+
+`compat-check` is read-only. It reports:
+
+- the detected `mod-playerbots` branch, commit, and remote when available
+- whether important config keys are present
+- whether the Docker override exists
+- whether bundled source patches are applicable, already applied, or incompatible
+
+Patch status meanings:
+
+- `applicable`: the patch should apply cleanly.
+- `already-applied`: the patch appears to already be present.
+- `incompatible`: the patch does not match this Playerbots source tree and needs
+  review before use.
+
+If `compat-check` reports incompatible patches, config presets may still be safe
+to use, but do not run `apply-patches lfg` until the patch mismatch is reviewed.
+
 ## Step 5: Preview Changes First
 
 Always run `--dry-run` first. This prints what the tuner would change without
@@ -400,6 +423,7 @@ unless you use `--skip-compose`.
 ```bash
 ./scripts/playerbots-tuner.sh list-presets
 ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots doctor
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots compat-check
 ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots diagnose-lfg
 ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots diagnose-pvp
 ./scripts/playerbots-tuner.sh print-macros

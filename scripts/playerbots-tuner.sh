@@ -46,6 +46,7 @@ Options:
 Commands:
   list-presets            Show available presets.
   list-populations        Show named bot population sizes.
+  compat-check            Check config keys and bundled patch compatibility.
   apply-preset NAME       Apply a config preset.
   apply-patches lfg       Apply optional Playerbots LFG reliability patches.
   doctor                  Check install layout and important Playerbots settings.
@@ -67,6 +68,7 @@ Examples:
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset solo-controller --restart
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --bots 1000 --dry-run
   ./scripts/playerbots-tuner.sh list-populations
+  ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots compat-check
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --population low --dry-run
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --min-bots 300 --max-bots 900
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches lfg --rebuild
@@ -115,7 +117,7 @@ parse_args() {
       --max-level) MAX_LEVEL="${2:-}"; shift 2 ;;
       --follow-distance) FOLLOW_DISTANCE="${2:-}"; shift 2 ;;
       -h|--help) usage; exit 0 ;;
-      list-presets|list-populations|apply-preset|apply-patches|doctor|diagnose-lfg|diagnose-pvp|print-macros|restore-latest|restart|rebuild)
+      list-presets|list-populations|compat-check|apply-preset|apply-patches|doctor|diagnose-lfg|diagnose-pvp|print-macros|restore-latest|restart|rebuild)
         [[ -z "$COMMAND" ]] || die "Only one command can be used at a time."
         COMMAND="$1"
         shift
@@ -140,6 +142,18 @@ require_server_dir() {
 require_docker_compose_file() {
   require_server_dir
   [[ -f "$SERVER_DIR/docker-compose.yml" || -f "$SERVER_DIR/compose.yml" ]] || die "No docker-compose.yml or compose.yml found in: $SERVER_DIR"
+}
+
+abs_dir() {
+  local dir="$1"
+  (cd "$dir" && pwd -P)
+}
+
+is_git_root() {
+  local dir="$1"
+  local top_level
+  top_level="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null || true)"
+  [[ -n "$top_level" && "$(abs_dir "$dir")" == "$(abs_dir "$top_level")" ]]
 }
 
 find_playerbots_dist_config() {
@@ -670,6 +684,18 @@ apply_patches() {
   esac
 }
 
+patch_status() {
+  local patch_file="$1"
+
+  if (cd "$SERVER_DIR" && git apply --check --recount "$patch_file" >/dev/null 2>&1); then
+    printf 'applicable\n'
+  elif (cd "$SERVER_DIR" && git apply --reverse --check --recount "$patch_file" >/dev/null 2>&1); then
+    printf 'already-applied\n'
+  else
+    printf 'incompatible\n'
+  fi
+}
+
 grep_config() {
   local config="$1"
   local pattern="$2"
@@ -677,6 +703,139 @@ grep_config() {
     grep -E "$pattern" "$config" || true
   else
     warn "Config file not found: $config"
+  fi
+}
+
+compat_check() {
+  require_server_dir
+
+  local module_dir="$SERVER_DIR/modules/mod-playerbots"
+  local config
+  local missing_keys=0
+  local incompatible_patches=0
+  local applicable_patches=0
+  local already_applied_patches=0
+
+  log "Compatibility check for: $SERVER_DIR"
+
+  if [[ -d "$module_dir" ]]; then
+    log "Found mod-playerbots: $module_dir"
+    if is_git_root "$module_dir"; then
+      local branch
+      local commit
+      local remote
+      branch="$(git -C "$module_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+      commit="$(git -C "$module_dir" rev-parse --short HEAD 2>/dev/null || true)"
+      remote="$(git -C "$module_dir" config --get remote.origin.url 2>/dev/null || true)"
+      printf 'mod-playerbots git branch: %s\n' "${branch:-unknown}"
+      printf 'mod-playerbots git commit: %s\n' "${commit:-unknown}"
+      printf 'mod-playerbots git remote: %s\n' "${remote:-unknown}"
+    else
+      warn "mod-playerbots is not its own Git checkout. Patch compatibility can still be checked from SERVER_DIR if it is a Git root."
+    fi
+  else
+    warn "mod-playerbots was not found at: $module_dir"
+  fi
+
+  config="$(find_playerbots_config || true)"
+  if [[ -z "$config" ]]; then
+    config="$(find_playerbots_dist_config || true)"
+  fi
+
+  if [[ -n "$config" ]]; then
+    log "Checking Playerbots config keys in: $config"
+    local key
+    local required_keys=(
+      "AiPlayerbot.RandomBotAutologin"
+      "AiPlayerbot.MinRandomBots"
+      "AiPlayerbot.MaxRandomBots"
+      "AiPlayerbot.RandomBotAccountCount"
+      "AiPlayerbot.RandomBotMinLevel"
+      "AiPlayerbot.RandomBotMaxLevel"
+      "AiPlayerbot.SyncLevelWithPlayers"
+      "AiPlayerbot.GroupInvitationPermission"
+      "AiPlayerbot.SummonWhenGroup"
+      "AiPlayerbot.AllowSummonWhenMasterIsDead"
+      "AiPlayerbot.AllowSummonWhenBotIsDead"
+      "AiPlayerbot.ReviveBotWhenSummoned"
+      "AiPlayerbot.FollowDistance"
+      "AiPlayerbot.ApplyInstanceStrategies"
+      "AiPlayerbot.AutoAvoidAoe"
+      "AiPlayerbot.AutoPartyBuffs"
+      "AiPlayerbot.EnableGreet"
+      "AiPlayerbot.RandomBotEmote"
+      "AiPlayerbot.RandomBotSayWithoutMaster"
+      "AiPlayerbot.RandomBotTalk"
+      "AiPlayerbot.EnableBroadcasts"
+      "AiPlayerbot.RandomBotJoinLfg"
+      "AiPlayerbot.RandomBotJoinBG"
+      "AiPlayerbot.RandomBotAutoJoinBG"
+      "AiPlayerbot.RandomBotAutoJoinArenaBracket"
+      "AiPlayerbot.RandomBotAutoJoinBGRatedArena3v3Count"
+      "AiPlayerbot.RandomBotArenaTeam3v3Count"
+    )
+
+    for key in "${required_keys[@]}"; do
+      if grep -qE "^[[:space:]]*#?[[:space:]]*${key}[[:space:]]*=" "$config"; then
+        printf 'config key ok: %s\n' "$key"
+      else
+        printf 'config key missing: %s\n' "$key"
+        missing_keys=$((missing_keys + 1))
+      fi
+    done
+  else
+    warn "Could not find playerbots.conf or playerbots.conf.dist. Config compatibility is unknown."
+    missing_keys=1
+  fi
+
+  local override
+  override="$(compose_override_file)"
+  if [[ -f "$override" ]]; then
+    log "Docker compose override found: $override"
+  else
+    warn "No docker-compose.override.yml found. The tuner can create one if compose updates are not skipped."
+  fi
+
+  if is_git_root "$SERVER_DIR"; then
+    log "Checking bundled LFG patch compatibility"
+    local patch_file
+    shopt -s nullglob
+    local patches=("$REPO_ROOT"/patches/playerbots/*.patch)
+    shopt -u nullglob
+    if [[ ${#patches[@]} -eq 0 ]]; then
+      warn "No bundled patch files were found."
+    fi
+
+    for patch_file in "${patches[@]}"; do
+      local status
+      status="$(patch_status "$patch_file")"
+      printf 'patch %-46s %s\n' "$(basename "$patch_file")" "$status"
+      case "$status" in
+        applicable) applicable_patches=$((applicable_patches + 1)) ;;
+        already-applied) already_applied_patches=$((already_applied_patches + 1)) ;;
+        incompatible) incompatible_patches=$((incompatible_patches + 1)) ;;
+      esac
+    done
+  else
+    warn "SERVER_DIR is not a Git root. Source patch compatibility cannot be checked safely with git apply."
+    incompatible_patches=1
+  fi
+
+  cat <<SUMMARY
+
+Compatibility summary:
+- Missing config keys: $missing_keys
+- Applicable patches: $applicable_patches
+- Already-applied patches: $already_applied_patches
+- Incompatible/unchecked patches: $incompatible_patches
+SUMMARY
+
+  if (( missing_keys == 0 && incompatible_patches == 0 )); then
+    log "Result: compatible with current tuner checks."
+  elif (( incompatible_patches > 0 )); then
+    warn "Result: config tuning may still work, but one or more source patches need review for this Playerbots version."
+  else
+    warn "Result: review missing config keys before applying presets."
   fi
 }
 
@@ -877,6 +1036,7 @@ main() {
   case "$COMMAND" in
     list-presets) list_presets ;;
     list-populations) list_populations ;;
+    compat-check) compat_check ;;
     apply-preset) apply_preset "${COMMAND_ARGS[@]}" ;;
     apply-patches) apply_patches "${COMMAND_ARGS[@]}" ;;
     doctor) doctor ;;
