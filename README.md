@@ -11,6 +11,15 @@ The tuner focuses on two kinds of changes:
 - config tuning that only needs an `ac-worldserver` restart
 - optional source patches that need an `ac-worldserver` rebuild
 
+## Development Status
+
+This project is under active development and should be considered experimental.
+It has safeguards such as `--dry-run`, timestamped config backups, confirmation
+prompts, and `restore-latest`, but every server install is a little different.
+
+Review the dry-run output before applying changes, keep your own server and
+database backups, and test on a non-production copy first when possible.
+
 ## Important Compatibility Note
 
 The standard AzerothCore repository is not enough for Playerbots. `mod-playerbots`
