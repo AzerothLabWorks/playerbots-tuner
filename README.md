@@ -53,6 +53,7 @@ Phase 1 config tuning includes:
 - solo/controller-friendly party behavior
 - random bot population and level range
 - LFG participation and dungeon strategy defaults
+- battleground progression brackets for Warsong Gulch, Arathi Basin, Eye of the Storm, Alterac Valley, and Isle of Conquest
 - tank/healer-biased random bot specs for dungeon queues
 - conservative level-80 rated 3v3 arena seeding
 - Docker Compose environment override alignment
@@ -265,6 +266,12 @@ Living server defaults:
 ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset living-server
 ```
 
+Progression battleground tuning:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset pvp-bg-progression
+```
+
 To apply and restart `ac-worldserver` in one command:
 
 ```bash
@@ -333,6 +340,19 @@ party bots to be easier to recover after death, summon, or movement drift.
 The current Azeroth Lab Works dungeon baseline: online random bots, level-synced
 leveling density, LFG participation, instance strategies, summon-on-group, and
 role-biased tank/healer specs.
+
+`pvp-bg-progression`
+
+Conservative battleground auto-join across leveling brackets. Enables Warsong
+Gulch, Arathi Basin, and Eye of the Storm across their configured progression
+brackets, while leaving Alterac Valley and Isle of Conquest at their endgame
+brackets with zero auto-created battles by default to avoid large over-queueing.
+
+`pvp-bg-all`
+
+Enables all configured battleground brackets with one auto-created battle per
+bracket. This is intended for stronger hosts and larger bot populations only.
+Use `--dry-run` first and monitor server performance.
 
 `pvp-3v3`
 
@@ -417,6 +437,64 @@ AC_AI_PLAYERBOT_MAX_RANDOM_BOTS: "N"
 ```
 
 unless you use `--skip-compose`.
+
+## Battleground And Arena Progression
+
+Battleground progression can be improved with config-only tuning. The tuner now
+includes:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset pvp-bg-progression --restart
+```
+
+This sets:
+
+```ini
+AiPlayerbot.RandomBotJoinBG = 1
+AiPlayerbot.RandomBotAutoJoinBG = 1
+AiPlayerbot.RandomBotAutoJoinWSBrackets = 0,1,2,3,4,5,6,7
+AiPlayerbot.RandomBotAutoJoinABBrackets = 0,1,2,3,4,5,6
+AiPlayerbot.RandomBotAutoJoinAVBrackets = 3
+AiPlayerbot.RandomBotAutoJoinEYBrackets = 0,1,2
+AiPlayerbot.RandomBotAutoJoinICBrackets = 1
+AiPlayerbot.RandomBotAutoJoinBGWSCount = 1
+AiPlayerbot.RandomBotAutoJoinBGABCount = 1
+AiPlayerbot.RandomBotAutoJoinBGAVCount = 0
+AiPlayerbot.RandomBotAutoJoinBGEYCount = 1
+AiPlayerbot.RandomBotAutoJoinBGICCount = 0
+```
+
+The tuner writes these exact `playerbots.conf` keys. It also writes best-effort
+Docker Compose environment overrides for matching `AC_AI_PLAYERBOT_*` names.
+If your Docker image uses different environment mapping, verify the final
+runtime values with `diagnose-pvp`.
+
+This is intentionally conservative:
+
+- Warsong Gulch is available across its leveling brackets.
+- Arathi Basin is available across its leveling brackets.
+- Eye of the Storm is available across its leveling brackets.
+- Alterac Valley and Isle of Conquest stay configured but do not auto-create
+  extra battles by default because they are larger and more resource-heavy.
+
+For stronger hosts, this enables all configured battleground brackets with one
+auto-created battle per bracket:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset pvp-bg-all --restart
+```
+
+Arena progression is different. The upstream Playerbots config currently notes
+that lower-level rated arena brackets require custom code changes. For that
+reason, this tuner keeps arena automation conservative and level-80 focused for
+now through:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset pvp-3v3 --restart
+```
+
+Lower-level arena support should be treated as future source-patch work rather
+than a safe config-only preset.
 
 ## Useful Commands
 

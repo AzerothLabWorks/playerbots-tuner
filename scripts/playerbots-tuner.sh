@@ -61,6 +61,8 @@ Presets:
   quiet-social            Disable repeated greetings/emotes while preserving useful bot chat.
   solo-controller         Quiet, stable party play for controller/low-friction leveling.
   dungeon-lfg             Leveling dungeon density, LFG participation, role-biased specs.
+  pvp-bg-progression      Conservative BG auto-join across leveling brackets.
+  pvp-bg-all              Enable all configured BG brackets; stronger hosts only.
   pvp-3v3                 Conservative level-80 rated 3v3 seeding.
   living-server           Dungeon + PvP + world social defaults.
 
@@ -560,19 +562,65 @@ apply_pvp_3v3() {
   set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_ARENA_TEAM_3V3_COUNT" "40"
 }
 
+apply_pvp_bg_progression() {
+  local config="$1"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotJoinBG" "1"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinBG" "1"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinWSBrackets" "0,1,2,3,4,5,6,7"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinABBrackets" "0,1,2,3,4,5,6"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinAVBrackets" "3"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinEYBrackets" "0,1,2"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinICBrackets" "1"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinBGWSCount" "1"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinBGABCount" "1"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinBGAVCount" "0"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinBGEYCount" "1"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinBGICCount" "0"
+
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_JOIN_BG" "1"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_BG" "1"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_WS_BRACKETS" "0,1,2,3,4,5,6,7"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_AB_BRACKETS" "0,1,2,3,4,5,6"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_AV_BRACKETS" "3"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_EY_BRACKETS" "0,1,2"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_IC_BRACKETS" "1"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_BG_WS_COUNT" "1"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_BG_AB_COUNT" "1"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_BG_AV_COUNT" "0"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_BG_EY_COUNT" "1"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_BG_IC_COUNT" "0"
+}
+
+apply_pvp_bg_all() {
+  local config="$1"
+  apply_pvp_bg_progression "$config"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinAVBrackets" "0,1,2,3"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinICBrackets" "0,1"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinBGAVCount" "1"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinBGICCount" "1"
+
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_AV_BRACKETS" "0,1,2,3"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_IC_BRACKETS" "0,1"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_BG_AV_COUNT" "1"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_BG_IC_COUNT" "1"
+}
+
 apply_living_server() {
   local config="$1"
   apply_dungeon_lfg "$config"
+  apply_pvp_bg_progression "$config"
   apply_pvp_3v3 "$config"
 }
 
 list_presets() {
   cat <<'PRESETS'
-quiet-social     Disable repeated greetings/emotes while preserving useful bot chat.
-solo-controller  Quiet, stable party play for controller/low-friction leveling.
-dungeon-lfg      Leveling dungeon density, LFG participation, role-biased specs.
-pvp-3v3          Conservative level-80 rated 3v3 seeding.
-living-server    Dungeon + PvP + world social defaults.
+quiet-social        Disable repeated greetings/emotes while preserving useful bot chat.
+solo-controller     Quiet, stable party play for controller/low-friction leveling.
+dungeon-lfg         Leveling dungeon density, LFG participation, role-biased specs.
+pvp-bg-progression  Conservative BG auto-join across leveling brackets.
+pvp-bg-all          Enable all configured BG brackets; stronger hosts only.
+pvp-3v3             Conservative level-80 rated 3v3 seeding.
+living-server       Dungeon + PvP + world social defaults.
 PRESETS
 }
 
@@ -598,6 +646,8 @@ apply_preset() {
     quiet-social) apply_quiet_social "$config" ;;
     solo-controller) apply_solo_controller "$config" ;;
     dungeon-lfg) apply_dungeon_lfg "$config" ;;
+    pvp-bg-progression) apply_pvp_bg_progression "$config" ;;
+    pvp-bg-all) apply_pvp_bg_all "$config" ;;
     pvp-3v3) apply_pvp_3v3 "$config" ;;
     living-server) apply_living_server "$config" ;;
     *) die "Unknown preset: $preset" ;;
@@ -770,6 +820,16 @@ compat_check() {
       "AiPlayerbot.RandomBotJoinLfg"
       "AiPlayerbot.RandomBotJoinBG"
       "AiPlayerbot.RandomBotAutoJoinBG"
+      "AiPlayerbot.RandomBotAutoJoinWSBrackets"
+      "AiPlayerbot.RandomBotAutoJoinABBrackets"
+      "AiPlayerbot.RandomBotAutoJoinAVBrackets"
+      "AiPlayerbot.RandomBotAutoJoinEYBrackets"
+      "AiPlayerbot.RandomBotAutoJoinICBrackets"
+      "AiPlayerbot.RandomBotAutoJoinBGWSCount"
+      "AiPlayerbot.RandomBotAutoJoinBGABCount"
+      "AiPlayerbot.RandomBotAutoJoinBGAVCount"
+      "AiPlayerbot.RandomBotAutoJoinBGEYCount"
+      "AiPlayerbot.RandomBotAutoJoinBGICCount"
       "AiPlayerbot.RandomBotAutoJoinArenaBracket"
       "AiPlayerbot.RandomBotAutoJoinBGRatedArena3v3Count"
       "AiPlayerbot.RandomBotArenaTeam3v3Count"
@@ -853,7 +913,7 @@ doctor() {
   config="$(find_playerbots_config || true)"
   if [[ -n "$config" ]]; then
     log "Found Playerbots config: $config"
-    grep_config "$config" '^[[:space:]]*AiPlayerbot\.(EnableGreet|RandomBotEmote|RandomBotSayWithoutMaster|SummonWhenGroup|AllowSummonWhenMasterIsDead|AllowSummonWhenBotIsDead|ReviveBotWhenSummoned|FollowDistance|RandomBotAutologin|MinRandomBots|MaxRandomBots|RandomBotJoinLfg|RandomBotJoinBG|RandomBotAutoJoinBG|RandomBotAutoJoinArenaBracket|RandomBotAutoJoinBGRatedArena3v3Count|RandomBotArenaTeam3v3Count|KeepAltsInGroup|EnablePeriodicOnlineOffline)[[:space:]]*='
+    grep_config "$config" '^[[:space:]]*AiPlayerbot\.(EnableGreet|RandomBotEmote|RandomBotSayWithoutMaster|SummonWhenGroup|AllowSummonWhenMasterIsDead|AllowSummonWhenBotIsDead|ReviveBotWhenSummoned|FollowDistance|RandomBotAutologin|MinRandomBots|MaxRandomBots|RandomBotJoinLfg|RandomBotJoinBG|RandomBotAutoJoinBG|RandomBotAutoJoin(WS|AB|AV|EY|IC)Brackets|RandomBotAutoJoinBG(WS|AB|AV|EY|IC)Count|RandomBotAutoJoinArenaBracket|RandomBotAutoJoinBGRatedArena3v3Count|RandomBotArenaTeam3v3Count|KeepAltsInGroup|EnablePeriodicOnlineOffline)[[:space:]]*='
   else
     warn "No playerbots.conf found. apply-preset can create one from playerbots.conf.dist."
   fi
@@ -946,13 +1006,13 @@ diagnose_pvp() {
   config="$(find_playerbots_config || true)"
 
   log "Playerbots BG/arena-related config"
-  grep_config "$config" '^[[:space:]]*AiPlayerbot\.(RandomBotJoinBG|RandomBotAutoJoinBG|RandomBotAutoJoinArenaBracket|RandomBotAutoJoinBGRatedArena2v2Count|RandomBotAutoJoinBGRatedArena3v3Count|RandomBotAutoJoinBGRatedArena5v5Count|RandomBotArenaTeam2v2Count|RandomBotArenaTeam3v3Count|RandomBotArenaTeam5v5Count|RandomBotArenaTeamMinRating|RandomBotArenaTeamMaxRating|DeleteRandomBotArenaTeams|MinRandomBots|MaxRandomBots|RandomBotMinLevel|RandomBotMaxLevel|SyncLevelWithPlayers)[[:space:]]*='
+  grep_config "$config" '^[[:space:]]*AiPlayerbot\.(RandomBotJoinBG|RandomBotAutoJoinBG|RandomBotAutoJoin(WS|AB|AV|EY|IC)Brackets|RandomBotAutoJoinBG(WS|AB|AV|EY|IC)Count|RandomBotAutoJoinArenaBracket|RandomBotAutoJoinBGRatedArena2v2Count|RandomBotAutoJoinBGRatedArena3v3Count|RandomBotAutoJoinBGRatedArena5v5Count|RandomBotArenaTeam2v2Count|RandomBotArenaTeam3v3Count|RandomBotArenaTeam5v5Count|RandomBotArenaTeamMinRating|RandomBotArenaTeamMaxRating|DeleteRandomBotArenaTeams|MinRandomBots|MaxRandomBots|RandomBotMinLevel|RandomBotMaxLevel|SyncLevelWithPlayers)[[:space:]]*='
 
   local override
   override="$(compose_override_file)"
   log "Docker override BG/arena-related environment"
   if [[ -f "$override" ]]; then
-    grep -E 'AC_AI_PLAYERBOT_(RANDOM_BOT_JOIN_BG|RANDOM_BOT_AUTO_JOIN_BG|RANDOM_BOT_AUTO_JOIN_ARENA_BRACKET|RANDOM_BOT_AUTO_JOIN_BG_RATED_ARENA|RANDOM_BOT_ARENA_TEAM|MIN_RANDOM_BOTS|MAX_RANDOM_BOTS|RANDOM_BOT_MIN_LEVEL|RANDOM_BOT_MAX_LEVEL|SYNC_LEVEL_WITH_PLAYERS)|AC_PLAYERBOTS' "$override" || true
+    grep -E 'AC_AI_PLAYERBOT_(RANDOM_BOT_JOIN_BG|RANDOM_BOT_AUTO_JOIN_BG|RANDOM_BOT_AUTO_JOIN_(WS|AB|AV|EY|IC)_BRACKETS|RANDOM_BOT_AUTO_JOIN_BG_(WS|AB|AV|EY|IC)_COUNT|RANDOM_BOT_AUTO_JOIN_ARENA_BRACKET|RANDOM_BOT_AUTO_JOIN_BG_RATED_ARENA|RANDOM_BOT_ARENA_TEAM|MIN_RANDOM_BOTS|MAX_RANDOM_BOTS|RANDOM_BOT_MIN_LEVEL|RANDOM_BOT_MAX_LEVEL|SYNC_LEVEL_WITH_PLAYERS)|AC_PLAYERBOTS' "$override" || true
   else
     warn "No docker-compose.override.yml found."
   fi
