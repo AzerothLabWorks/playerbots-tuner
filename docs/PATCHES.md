@@ -38,3 +38,27 @@ cannot be applied. Patch changes require rebuilding `ac-worldserver`.
 The patch files are intentionally small, but `mod-playerbots` changes quickly.
 If a patch fails, inspect the target files in the installed module and either
 port the patch manually or wait for a tuner patch update.
+
+## `apply-patches arena-lower-brackets`
+
+Experimental patch set for lower-level rated arena brackets.
+
+Upstream Playerbots config currently notes that lower-level arena brackets
+require custom code changes. This patch changes random bot arena team creation,
+team filling, and queue gathering to use the configured
+`AiPlayerbot.RandomBotAutoJoinArenaBracket` level range instead of hardcoded
+level 70+ checks.
+
+Apply:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches arena-lower-brackets --rebuild
+```
+
+Then configure the experimental 2v2 preset:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset pvp-arena-2v2-experimental --arena-bracket 2 --restart
+```
+
+Treat this as experimental and test on a non-production copy first.

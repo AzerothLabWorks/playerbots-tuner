@@ -354,6 +354,12 @@ Enables all configured battleground brackets with one auto-created battle per
 bracket. This is intended for stronger hosts and larger bot populations only.
 Use `--dry-run` first and monitor server performance.
 
+`pvp-arena-2v2-experimental`
+
+Experimental lower-bracket rated 2v2 tuning. Requires
+`apply-patches arena-lower-brackets` and a rebuild before use. This preset is
+intended for testing progression arena brackets such as 20-24 or 30-34.
+
 `pvp-3v3`
 
 Conservative level-80 rated 3v3 seeding.
@@ -493,8 +499,86 @@ now through:
 ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset pvp-3v3 --restart
 ```
 
-Lower-level arena support should be treated as future source-patch work rather
-than a safe config-only preset.
+Lower-level arena support is not a safe config-only preset. Use the experimental
+workflow below only on a test copy or with backups.
+
+## Experimental Lower-Level Arena
+
+Lower-level rated arena is experimental. Upstream Playerbots currently notes
+that lower-level arena brackets require custom code changes, so this workflow is
+split into two explicit steps:
+
+1. apply an experimental source patch
+2. apply an experimental arena preset
+
+Run compatibility first:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots compat-check
+```
+
+Preview the experimental patch:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots --dry-run apply-patches arena-lower-brackets
+```
+
+Apply the patch and rebuild:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches arena-lower-brackets --rebuild
+```
+
+Then configure a lower-level rated 2v2 bracket. Example for bracket `2`, which
+is level `20-24`:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset pvp-arena-2v2-experimental --arena-bracket 2 --restart
+```
+
+Arena bracket reference:
+
+| Bracket | Level Range |
+|---:|---|
+| `0` | 10-14 |
+| `1` | 15-19 |
+| `2` | 20-24 |
+| `3` | 25-29 |
+| `4` | 30-34 |
+| `5` | 35-39 |
+| `6` | 40-44 |
+| `7` | 45-49 |
+| `8` | 50-54 |
+| `9` | 55-59 |
+| `10` | 60-64 |
+| `11` | 65-69 |
+| `12` | 70-74 |
+| `13` | 75-79 |
+| `14` | 80 |
+
+Optional tuning:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset pvp-arena-2v2-experimental --arena-bracket 4 --arena-matches 1 --arena-teams 40 --restart
+```
+
+If your server already generated random bot arena teams for a different bracket,
+you may need to reset random bot arena teams once:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset pvp-arena-2v2-experimental --arena-bracket 4 --reset-arena-teams --restart
+```
+
+After the server has deleted/recreated teams, set the preset again without
+`--reset-arena-teams` so `AiPlayerbot.DeleteRandomBotArenaTeams` returns to `0`:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset pvp-arena-2v2-experimental --arena-bracket 4 --restart
+```
+
+This experimental patch changes the random arena team level gates from hardcoded
+level 70+ checks to the configured `AiPlayerbot.RandomBotAutoJoinArenaBracket`
+level range. It should be tested on a non-production copy first.
 
 ## Useful Commands
 

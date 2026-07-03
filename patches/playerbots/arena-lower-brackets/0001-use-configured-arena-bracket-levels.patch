@@ -1,0 +1,99 @@
+diff --git a/modules/mod-playerbots/src/Ai/Base/Actions/BattleGroundJoinAction.cpp b/modules/mod-playerbots/src/Ai/Base/Actions/BattleGroundJoinAction.cpp
+index 58ee42c..ba5cd6b 100644
+--- a/modules/mod-playerbots/src/Ai/Base/Actions/BattleGroundJoinAction.cpp
++++ b/modules/mod-playerbots/src/Ai/Base/Actions/BattleGroundJoinAction.cpp
+@@ -58,6 +58,19 @@ bool BGJoinAction::Execute(Event /*event*/)
+ 
+ bool BGJoinAction::gatherArenaTeam(ArenaType type)
+ {
++    auto isInConfiguredArenaBracket = [](Player* player) -> bool
++    {
++        if (!player)
++            return false;
++
++        uint32 bracket = sPlayerbotAIConfig.randomBotAutoJoinArenaBracket;
++        uint8 minLevel = bracket >= 14 ? 80 : 10 + bracket * 5;
++        uint8 maxLevel = bracket >= 14 ? 80 : minLevel + 4;
++        if (maxLevel > 80)
++            maxLevel = 80;
++
++        return player->GetLevel() >= minLevel && player->GetLevel() <= maxLevel;
++    };
+     ArenaTeam* arenateam = sArenaTeamMgr->GetArenaTeamByCaptain(bot->GetGUID(), type);
+ 
+     if (!arenateam)
+@@ -158,7 +171,7 @@ bool BGJoinAction::gatherArenaTeam(ArenaType type)
+         if (!member)
+             continue;
+ 
+-        if (member->GetLevel() < 70)
++        if (!isInConfiguredArenaBracket(member))
+             continue;
+ 
+         if (!group->AddMember(member))
+diff --git a/modules/mod-playerbots/src/Bot/Factory/PlayerbotFactory.cpp b/modules/mod-playerbots/src/Bot/Factory/PlayerbotFactory.cpp
+index 2ef0f53..7b5a7f5 100644
+--- a/modules/mod-playerbots/src/Bot/Factory/PlayerbotFactory.cpp
++++ b/modules/mod-playerbots/src/Bot/Factory/PlayerbotFactory.cpp
+@@ -4790,7 +4790,14 @@ void PlayerbotFactory::InitArenaTeam()
+             continue;
+         }
+ 
+-        if (arenateam->GetMembersSize() < ((uint32)arenateam->GetType()) && bot->GetLevel() >= 70)
++        uint32 bracket = sPlayerbotAIConfig.randomBotAutoJoinArenaBracket;
++        uint8 minArenaLevel = bracket >= 14 ? 80 : 10 + bracket * 5;
++        uint8 maxArenaLevel = bracket >= 14 ? 80 : minArenaLevel + 4;
++        if (maxArenaLevel > 80)
++            maxArenaLevel = 80;
++
++        if (arenateam->GetMembersSize() < ((uint32)arenateam->GetType()) && bot->GetLevel() >= minArenaLevel &&
++            bot->GetLevel() <= maxArenaLevel)
+         {
+             ObjectGuid capt = arenateam->GetCaptain();
+             Player* botcaptain = ObjectAccessor::FindPlayer(capt);
+diff --git a/modules/mod-playerbots/src/Bot/Factory/RandomPlayerbotFactory.cpp b/modules/mod-playerbots/src/Bot/Factory/RandomPlayerbotFactory.cpp
+index 002720a..45d18ee 100644
+--- a/modules/mod-playerbots/src/Bot/Factory/RandomPlayerbotFactory.cpp
++++ b/modules/mod-playerbots/src/Bot/Factory/RandomPlayerbotFactory.cpp
+@@ -785,6 +785,19 @@ std::string const RandomPlayerbotFactory::CreateRandomGuildName()
+ 
+ void RandomPlayerbotFactory::CreateRandomArenaTeams(ArenaType type, uint32 count)
+ {
++    auto isInConfiguredArenaBracket = [](Player* player) -> bool
++    {
++        if (!player)
++            return false;
++
++        uint32 bracket = sPlayerbotAIConfig.randomBotAutoJoinArenaBracket;
++        uint8 minLevel = bracket >= 14 ? 80 : 10 + bracket * 5;
++        uint8 maxLevel = bracket >= 14 ? 80 : minLevel + 4;
++        if (maxLevel > 80)
++            maxLevel = 80;
++
++        return player->GetLevel() >= minLevel && player->GetLevel() <= maxLevel;
++    };
+     std::vector<uint32> randomBots;
+ 
+     PlayerbotsDatabasePreparedStatement* stmt = PlayerbotsDatabase.GetPreparedStatement(PLAYERBOTS_SEL_RANDOM_BOTS_BOT);
+@@ -814,7 +827,7 @@ void RandomPlayerbotFactory::CreateRandomArenaTeams(ArenaType type, uint32 count
+         {
+             Player* player = ObjectAccessor::FindConnectedPlayer(captain);
+ 
+-            if (!arenateam && player && player->GetLevel() >= 70)
++            if (!arenateam && isInConfiguredArenaBracket(player))
+                 availableCaptains.push_back(captain);
+         }
+     }
+@@ -840,9 +853,10 @@ void RandomPlayerbotFactory::CreateRandomArenaTeams(ArenaType type, uint32 count
+             continue;
+         }
+ 
+-        if (player->GetLevel() < 70)
++        if (!isInConfiguredArenaBracket(player))
+         {
+-            LOG_ERROR("playerbots", "Bot {} must be level 70 to create an arena team", captain.ToString().c_str());
++            LOG_ERROR("playerbots", "Bot {} is not in configured random arena bracket {}", captain.ToString().c_str(),
++                      sPlayerbotAIConfig.randomBotAutoJoinArenaBracket);
+             continue;
+         }
+ 

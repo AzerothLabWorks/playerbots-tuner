@@ -18,6 +18,10 @@ POPULATION=""
 MIN_LEVEL=""
 MAX_LEVEL=""
 FOLLOW_DISTANCE=""
+ARENA_BRACKET=""
+ARENA_MATCHES=""
+ARENA_TEAMS=""
+RESET_ARENA_TEAMS=0
 
 BACKUP_STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKED_UP_FILES=""
@@ -41,6 +45,10 @@ Options:
   --min-level N           Override preset random bot minimum level.
   --max-level N           Override preset random bot maximum level.
   --follow-distance N     Override preset follow distance in yards.
+  --arena-bracket N       Arena bracket for experimental arena presets. 0=10-14, 14=80.
+  --arena-matches N       Auto-created rated arena matches for experimental arena presets.
+  --arena-teams N         Random bot arena teams for experimental arena presets.
+  --reset-arena-teams     Set DeleteRandomBotArenaTeams = 1 for one restart.
   -h, --help              Show this help.
 
 Commands:
@@ -49,6 +57,8 @@ Commands:
   compat-check            Check config keys and bundled patch compatibility.
   apply-preset NAME       Apply a config preset.
   apply-patches lfg       Apply optional Playerbots LFG reliability patches.
+  apply-patches arena-lower-brackets
+                         Apply experimental lower-level arena bracket patches.
   doctor                  Check install layout and important Playerbots settings.
   diagnose-lfg            Show LFG-related config and recent worldserver logs.
   diagnose-pvp            Show PvP-related config and recent worldserver logs.
@@ -63,6 +73,8 @@ Presets:
   dungeon-lfg             Leveling dungeon density, LFG participation, role-biased specs.
   pvp-bg-progression      Conservative BG auto-join across leveling brackets.
   pvp-bg-all              Enable all configured BG brackets; stronger hosts only.
+  pvp-arena-2v2-experimental
+                         Experimental lower-bracket rated 2v2 arena tuning.
   pvp-3v3                 Conservative level-80 rated 3v3 seeding.
   living-server           Dungeon + PvP + world social defaults.
 
@@ -73,6 +85,8 @@ Examples:
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots compat-check
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --population low --dry-run
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --min-bots 300 --max-bots 900
+  ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches arena-lower-brackets --rebuild
+  ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset pvp-arena-2v2-experimental --arena-bracket 2
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches lfg --rebuild
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots restore-latest --restart
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots doctor
@@ -118,6 +132,10 @@ parse_args() {
       --min-level) MIN_LEVEL="${2:-}"; shift 2 ;;
       --max-level) MAX_LEVEL="${2:-}"; shift 2 ;;
       --follow-distance) FOLLOW_DISTANCE="${2:-}"; shift 2 ;;
+      --arena-bracket) ARENA_BRACKET="${2:-}"; shift 2 ;;
+      --arena-matches) ARENA_MATCHES="${2:-}"; shift 2 ;;
+      --arena-teams) ARENA_TEAMS="${2:-}"; shift 2 ;;
+      --reset-arena-teams) RESET_ARENA_TEAMS=1; shift ;;
       -h|--help) usage; exit 0 ;;
       list-presets|list-populations|compat-check|apply-preset|apply-patches|doctor|diagnose-lfg|diagnose-pvp|print-macros|restore-latest|restart|rebuild)
         [[ -z "$COMMAND" ]] || die "Only one command can be used at a time."
@@ -340,6 +358,45 @@ resolve_bot_counts() {
   fi
 
   printf '%s %s\n' "$min_bots" "$max_bots"
+}
+
+arena_bracket_label() {
+  local bracket="$1"
+  if (( bracket >= 14 )); then
+    printf '80\n'
+  else
+    local min_level=$((10 + bracket * 5))
+    local max_level=$((min_level + 4))
+    printf '%s-%s\n' "$min_level" "$max_level"
+  fi
+}
+
+resolve_arena_bracket() {
+  local default_bracket="$1"
+  local bracket="${ARENA_BRACKET:-$default_bracket}"
+
+  require_non_negative_integer "--arena-bracket" "$bracket"
+  if (( bracket > 14 )); then
+    die "--arena-bracket must be between 0 and 14. Received: $bracket"
+  fi
+
+  printf '%s\n' "$bracket"
+}
+
+resolve_arena_matches() {
+  local default_matches="$1"
+  local matches="${ARENA_MATCHES:-$default_matches}"
+
+  require_non_negative_integer "--arena-matches" "$matches"
+  printf '%s\n' "$matches"
+}
+
+resolve_arena_teams() {
+  local default_teams="$1"
+  local teams="${ARENA_TEAMS:-$default_teams}"
+
+  require_non_negative_integer "--arena-teams" "$teams"
+  printf '%s\n' "$teams"
 }
 
 set_conf_value() {
@@ -605,6 +662,41 @@ apply_pvp_bg_all() {
   set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_BG_IC_COUNT" "1"
 }
 
+apply_pvp_arena_2v2_experimental() {
+  local config="$1"
+  local bracket
+  local matches
+  local teams
+
+  bracket="$(resolve_arena_bracket 2)"
+  matches="$(resolve_arena_matches 1)"
+  teams="$(resolve_arena_teams 30)"
+
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotJoinBG" "1"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinBG" "1"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinArenaBracket" "$bracket"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinBGRatedArena2v2Count" "$matches"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinBGRatedArena3v3Count" "0"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotAutoJoinBGRatedArena5v5Count" "0"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotArenaTeam2v2Count" "$teams"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotArenaTeam3v3Count" "0"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotArenaTeam5v5Count" "0"
+  set_playerbot_value "$config" "AiPlayerbot.DeleteRandomBotArenaTeams" "$RESET_ARENA_TEAMS"
+
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_JOIN_BG" "1"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_BG" "1"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_ARENA_BRACKET" "$bracket"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_BG_RATED_ARENA_2V2_COUNT" "$matches"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_BG_RATED_ARENA_3V3_COUNT" "0"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_AUTO_JOIN_BG_RATED_ARENA_5V5_COUNT" "0"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_ARENA_TEAM_2V2_COUNT" "$teams"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_ARENA_TEAM_3V3_COUNT" "0"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_ARENA_TEAM_5V5_COUNT" "0"
+  set_playerbot_env "AC_AI_PLAYERBOT_DELETE_RANDOM_BOT_ARENA_TEAMS" "$RESET_ARENA_TEAMS"
+
+  log "Configured experimental rated 2v2 arena bracket $bracket ($(arena_bracket_label "$bracket")) with $matches match target and $teams random bot teams."
+}
+
 apply_living_server() {
   local config="$1"
   apply_dungeon_lfg "$config"
@@ -614,13 +706,14 @@ apply_living_server() {
 
 list_presets() {
   cat <<'PRESETS'
-quiet-social        Disable repeated greetings/emotes while preserving useful bot chat.
-solo-controller     Quiet, stable party play for controller/low-friction leveling.
-dungeon-lfg         Leveling dungeon density, LFG participation, role-biased specs.
-pvp-bg-progression  Conservative BG auto-join across leveling brackets.
-pvp-bg-all          Enable all configured BG brackets; stronger hosts only.
-pvp-3v3             Conservative level-80 rated 3v3 seeding.
-living-server       Dungeon + PvP + world social defaults.
+quiet-social                  Disable repeated greetings/emotes while preserving useful bot chat.
+solo-controller               Quiet, stable party play for controller/low-friction leveling.
+dungeon-lfg                   Leveling dungeon density, LFG participation, role-biased specs.
+pvp-bg-progression            Conservative BG auto-join across leveling brackets.
+pvp-bg-all                    Enable all configured BG brackets; stronger hosts only.
+pvp-arena-2v2-experimental    Experimental lower-bracket rated 2v2 arena tuning.
+pvp-3v3                       Conservative level-80 rated 3v3 seeding.
+living-server                 Dungeon + PvP + world social defaults.
 PRESETS
 }
 
@@ -648,6 +741,7 @@ apply_preset() {
     dungeon-lfg) apply_dungeon_lfg "$config" ;;
     pvp-bg-progression) apply_pvp_bg_progression "$config" ;;
     pvp-bg-all) apply_pvp_bg_all "$config" ;;
+    pvp-arena-2v2-experimental) apply_pvp_arena_2v2_experimental "$config" ;;
     pvp-3v3) apply_pvp_3v3 "$config" ;;
     living-server) apply_living_server "$config" ;;
     *) die "Unknown preset: $preset" ;;
@@ -693,14 +787,15 @@ rebuild_worldserver() {
   fi
 }
 
-apply_lfg_patches() {
+apply_patch_dir() {
   require_server_dir
+  local patch_dir="$1"
+  local missing_message="$2"
   local module_dir="$SERVER_DIR/modules/mod-playerbots"
   [[ -d "$module_dir" ]] || die "mod-playerbots is not installed at: $module_dir"
 
-  local patch_dir="$REPO_ROOT/patches/playerbots"
   local patches=("$patch_dir"/*.patch)
-  [[ -f "${patches[0]:-}" ]] || die "No patch files found in: $patch_dir"
+  [[ -f "${patches[0]:-}" ]] || die "$missing_message: $patch_dir"
 
   local patch_file
   for patch_file in "${patches[@]}"; do
@@ -708,10 +803,11 @@ apply_lfg_patches() {
     if (cd "$SERVER_DIR" && git apply --check --recount "$patch_file"); then
       if [[ "$DRY_RUN" == "1" ]]; then
         printf '[dry-run] cd %q && git apply --recount %q\n' "$SERVER_DIR" "$patch_file"
+        log "Would apply $(basename "$patch_file")."
       else
         (cd "$SERVER_DIR" && git apply --recount "$patch_file")
+        log "Applied $(basename "$patch_file")."
       fi
-      log "Applied $(basename "$patch_file")."
     elif (cd "$SERVER_DIR" && git apply --reverse --check --recount "$patch_file"); then
       warn "Already applied: $(basename "$patch_file")"
     else
@@ -726,11 +822,20 @@ apply_lfg_patches() {
   fi
 }
 
+apply_lfg_patches() {
+  apply_patch_dir "$REPO_ROOT/patches/playerbots" "No LFG patch files found"
+}
+
+apply_arena_lower_bracket_patches() {
+  apply_patch_dir "$REPO_ROOT/patches/playerbots/arena-lower-brackets" "No arena lower-bracket patch files found"
+}
+
 apply_patches() {
   local patch_set="${1:-}"
   case "$patch_set" in
     lfg) apply_lfg_patches ;;
-    *) die "Unknown patch set: ${patch_set:-}. Available patch set: lfg" ;;
+    arena-lower-brackets) apply_arena_lower_bracket_patches ;;
+    *) die "Unknown patch set: ${patch_set:-}. Available patch sets: lfg, arena-lower-brackets" ;;
   esac
 }
 
@@ -860,7 +965,7 @@ compat_check() {
     log "Checking bundled LFG patch compatibility"
     local patch_file
     shopt -s nullglob
-    local patches=("$REPO_ROOT"/patches/playerbots/*.patch)
+    local patches=("$REPO_ROOT"/patches/playerbots/*.patch "$REPO_ROOT"/patches/playerbots/arena-lower-brackets/*.patch)
     shopt -u nullglob
     if [[ ${#patches[@]} -eq 0 ]]; then
       warn "No bundled patch files were found."
