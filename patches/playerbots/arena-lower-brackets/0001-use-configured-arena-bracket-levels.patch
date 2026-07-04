@@ -11,11 +11,21 @@ index 58ee42c..ba5cd6b 100644
 +        if (!player)
 +            return false;
 +
++        constexpr uint32 EndgameArenaBracket = 14;
++        constexpr uint8 FirstArenaBracketMinLevel = 10;
++        constexpr uint8 ArenaBracketLevelRange = 5;
++        constexpr uint8 MaxArenaLevel = 80;
 +        uint32 bracket = sPlayerbotAIConfig.randomBotAutoJoinArenaBracket;
-+        uint8 minLevel = bracket >= 14 ? 80 : 10 + bracket * 5;
-+        uint8 maxLevel = bracket >= 14 ? 80 : minLevel + 4;
-+        if (maxLevel > 80)
-+            maxLevel = 80;
++        uint8 minLevel = MaxArenaLevel;
++        if (bracket < EndgameArenaBracket)
++            minLevel = static_cast<uint8>(FirstArenaBracketMinLevel + bracket * ArenaBracketLevelRange);
++
++        uint8 maxLevel = MaxArenaLevel;
++        if (bracket < EndgameArenaBracket)
++            maxLevel = static_cast<uint8>(minLevel + ArenaBracketLevelRange - 1);
++
++        if (maxLevel > MaxArenaLevel)
++            maxLevel = MaxArenaLevel;
 +
 +        return player->GetLevel() >= minLevel && player->GetLevel() <= maxLevel;
 +    };
@@ -40,14 +50,24 @@ index 2ef0f53..7b5a7f5 100644
          }
  
 -        if (arenateam->GetMembersSize() < ((uint32)arenateam->GetType()) && bot->GetLevel() >= 70)
++        constexpr uint32 EndgameArenaBracket = 14;
++        constexpr uint8 FirstArenaBracketMinLevel = 10;
++        constexpr uint8 ArenaBracketLevelRange = 5;
++        constexpr uint8 MaxArenaLevel = 80;
 +        uint32 bracket = sPlayerbotAIConfig.randomBotAutoJoinArenaBracket;
-+        uint8 minArenaLevel = bracket >= 14 ? 80 : 10 + bracket * 5;
-+        uint8 maxArenaLevel = bracket >= 14 ? 80 : minArenaLevel + 4;
-+        if (maxArenaLevel > 80)
-+            maxArenaLevel = 80;
++        uint8 minArenaLevel = MaxArenaLevel;
++        if (bracket < EndgameArenaBracket)
++            minArenaLevel = static_cast<uint8>(FirstArenaBracketMinLevel + bracket * ArenaBracketLevelRange);
 +
-+        if (arenateam->GetMembersSize() < ((uint32)arenateam->GetType()) && bot->GetLevel() >= minArenaLevel &&
-+            bot->GetLevel() <= maxArenaLevel)
++        uint8 maxArenaLevel = MaxArenaLevel;
++        if (bracket < EndgameArenaBracket)
++            maxArenaLevel = static_cast<uint8>(minArenaLevel + ArenaBracketLevelRange - 1);
++
++        if (maxArenaLevel > MaxArenaLevel)
++            maxArenaLevel = MaxArenaLevel;
++
++        if (arenateam->GetMembersSize() < static_cast<uint32>(arenateam->GetType()) &&
++            bot->GetLevel() >= minArenaLevel && bot->GetLevel() <= maxArenaLevel)
          {
              ObjectGuid capt = arenateam->GetCaptain();
              Player* botcaptain = ObjectAccessor::FindPlayer(capt);
@@ -64,11 +84,21 @@ index 002720a..45d18ee 100644
 +        if (!player)
 +            return false;
 +
++        constexpr uint32 EndgameArenaBracket = 14;
++        constexpr uint8 FirstArenaBracketMinLevel = 10;
++        constexpr uint8 ArenaBracketLevelRange = 5;
++        constexpr uint8 MaxArenaLevel = 80;
 +        uint32 bracket = sPlayerbotAIConfig.randomBotAutoJoinArenaBracket;
-+        uint8 minLevel = bracket >= 14 ? 80 : 10 + bracket * 5;
-+        uint8 maxLevel = bracket >= 14 ? 80 : minLevel + 4;
-+        if (maxLevel > 80)
-+            maxLevel = 80;
++        uint8 minLevel = MaxArenaLevel;
++        if (bracket < EndgameArenaBracket)
++            minLevel = static_cast<uint8>(FirstArenaBracketMinLevel + bracket * ArenaBracketLevelRange);
++
++        uint8 maxLevel = MaxArenaLevel;
++        if (bracket < EndgameArenaBracket)
++            maxLevel = static_cast<uint8>(minLevel + ArenaBracketLevelRange - 1);
++
++        if (maxLevel > MaxArenaLevel)
++            maxLevel = MaxArenaLevel;
 +
 +        return player->GetLevel() >= minLevel && player->GetLevel() <= maxLevel;
 +    };

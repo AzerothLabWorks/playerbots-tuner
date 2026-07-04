@@ -30,10 +30,14 @@ diff --git a/modules/mod-playerbots/src/Ai/Base/Actions/TradeStatusAction.cpp b/
 +        return;
 +
 +    for (uint32 slot = 0; slot < TRADE_SLOT_TRADED_COUNT; ++slot)
-+        if (tradeData->GetItem((TradeSlots)slot))
++        if (tradeData->GetItem(static_cast<TradeSlots>(slot)))
 +            return;
 +
-+    std::vector<ItemUsage> offerUsages = {ITEM_USAGE_VENDOR, ITEM_USAGE_AH, ITEM_USAGE_DISENCHANT, ITEM_USAGE_NONE};
++    constexpr uint32 MaxOfferedTradeItems = 3;
++    std::vector<ItemUsage> const offerUsages =
++    {
++        ITEM_USAGE_VENDOR, ITEM_USAGE_AH, ITEM_USAGE_DISENCHANT, ITEM_USAGE_NONE
++    };
 +    uint32 offered = 0;
 +
 +    for (ItemUsage usage : offerUsages)
@@ -60,7 +64,7 @@ diff --git a/modules/mod-playerbots/src/Ai/Base/Actions/TradeStatusAction.cpp b/
 +            int8 tradeSlot = -1;
 +            for (uint8 slot = 0; slot < TRADE_SLOT_TRADED_COUNT; ++slot)
 +            {
-+                if (!tradeData->GetItem((TradeSlots)slot))
++                if (!tradeData->GetItem(static_cast<TradeSlots>(slot)))
 +                {
 +                    tradeSlot = slot;
 +                    break;
@@ -71,12 +75,12 @@ diff --git a/modules/mod-playerbots/src/Ai/Base/Actions/TradeStatusAction.cpp b/
 +                return;
 +
 +            WorldPacket packet(CMSG_SET_TRADE_ITEM, 3);
-+            packet << (uint8)tradeSlot;
-+            packet << (uint8)item->GetBagSlot();
-+            packet << (uint8)item->GetSlot();
++            packet << static_cast<uint8>(tradeSlot);
++            packet << static_cast<uint8>(item->GetBagSlot());
++            packet << static_cast<uint8>(item->GetSlot());
 +            bot->GetSession()->HandleSetTradeItemOpcode(packet);
 +
-+            if (++offered >= 3)
++            if (++offered >= MaxOfferedTradeItems)
 +                return;
 +        }
 +    }
