@@ -208,6 +208,8 @@ For a deeper compatibility check against your installed Playerbots version:
 
 - the detected `mod-playerbots` branch, commit, and remote when available
 - whether important config keys are present
+- whether your runtime `playerbots.conf` is missing keys from the current
+  `playerbots.conf.dist`
 - whether the Docker override exists
 - whether bundled source patches are applicable, already applied, or incompatible
 
@@ -220,6 +222,29 @@ Patch status meanings:
 
 If `compat-check` reports incompatible patches, config presets may still be safe
 to use, but do not run `apply-patches lfg` until the patch mismatch is reviewed.
+
+If `compat-check` reports that your runtime `playerbots.conf` is missing keys
+from `playerbots.conf.dist`, your Playerbots module may have been updated after
+the config file was first created. This is common with fast-moving modules. To
+regenerate from the current `.dist` file and then apply a preset, use
+`--refresh-config`.
+
+Preview first:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots --dry-run apply-preset dungeon-lfg --refresh-config
+```
+
+Apply:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --refresh-config --restart
+```
+
+`--refresh-config` creates a timestamped backup of the existing
+`playerbots.conf`, replaces it from the current `playerbots.conf.dist`, and then
+applies the selected tuner preset. Use this when upstream Playerbots adds new
+config keys and your existing runtime config is stale.
 
 ## Step 5: Preview Changes First
 

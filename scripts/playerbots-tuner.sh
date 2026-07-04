@@ -11,6 +11,7 @@ YES=0
 RESTART=0
 REBUILD=0
 SKIP_COMPOSE=0
+REFRESH_CONFIG=0
 BOT_COUNT=""
 MIN_BOTS=""
 MAX_BOTS=""
@@ -38,6 +39,7 @@ Options:
   --restart               Restart ac-worldserver after config changes.
   --rebuild               Rebuild and restart ac-worldserver after patch changes.
   --skip-compose          Do not update docker-compose.override.yml environment values.
+  --refresh-config        Recreate playerbots.conf from current playerbots.conf.dist before applying a preset.
   --population NAME       Use a bot count size: tiny, low, medium, high, very-high.
   --bots N                Set min and max random bot count to the same value.
   --min-bots N            Override minimum online random bot count.
@@ -125,6 +127,7 @@ parse_args() {
       --restart) RESTART=1; shift ;;
       --rebuild) REBUILD=1; shift ;;
       --skip-compose) SKIP_COMPOSE=1; shift ;;
+      --refresh-config) REFRESH_CONFIG=1; shift ;;
       --bots) BOT_COUNT="${2:-}"; shift 2 ;;
       --min-bots) MIN_BOTS="${2:-}"; shift 2 ;;
       --max-bots) MAX_BOTS="${2:-}"; shift 2 ;;
@@ -214,6 +217,19 @@ ensure_playerbots_config() {
   local config_file
   config_file="$(find_playerbots_config || true)"
   if [[ -n "$config_file" ]]; then
+    if [[ "$REFRESH_CONFIG" == "1" ]]; then
+      local dist_file
+      dist_file="$(find_playerbots_dist_config || true)"
+      [[ -n "$dist_file" ]] || die "--refresh-config requested, but playerbots.conf.dist was not found."
+
+      log "Refreshing Playerbots runtime config from: $dist_file"
+      backup_file_once "$config_file"
+      if [[ "$DRY_RUN" == "1" ]]; then
+        printf '[dry-run] cp %q %q\n' "$dist_file" "$config_file" >&2
+      else
+        cp "$dist_file" "$config_file"
+      fi
+    fi
     printf '%s\n' "$config_file"
     return 0
   fi
@@ -861,12 +877,33 @@ grep_config() {
   fi
 }
 
+escape_regex() {
+  printf '%s\n' "$1" | sed -E 's/[][(){}.^$*+?|\\/]/\\&/g'
+}
+
+config_has_key() {
+  local config="$1"
+  local key="$2"
+  local escaped
+  escaped="$(escape_regex "$key")"
+
+  grep -qE "^[[:space:]]*#?[[:space:]]*${escaped}[[:space:]]*=" "$config"
+}
+
+list_config_keys() {
+  local config="$1"
+  sed -nE 's/^[[:space:]]*#?[[:space:]]*([A-Za-z0-9_.]+)[[:space:]]*=.*/\1/p' "$config" | sort -u
+}
+
 compat_check() {
   require_server_dir
 
   local module_dir="$SERVER_DIR/modules/mod-playerbots"
   local config
+  local runtime_config
+  local dist_config
   local missing_keys=0
+  local missing_dist_keys=0
   local incompatible_patches=0
   local applicable_patches=0
   local already_applied_patches=0
@@ -892,9 +929,11 @@ compat_check() {
     warn "mod-playerbots was not found at: $module_dir"
   fi
 
-  config="$(find_playerbots_config || true)"
+  runtime_config="$(find_playerbots_config || true)"
+  dist_config="$(find_playerbots_dist_config || true)"
+  config="$runtime_config"
   if [[ -z "$config" ]]; then
-    config="$(find_playerbots_dist_config || true)"
+    config="$dist_config"
   fi
 
   if [[ -n "$config" ]]; then
@@ -941,7 +980,7 @@ compat_check() {
     )
 
     for key in "${required_keys[@]}"; do
-      if grep -qE "^[[:space:]]*#?[[:space:]]*${key}[[:space:]]*=" "$config"; then
+      if config_has_key "$config" "$key"; then
         printf 'config key ok: %s\n' "$key"
       else
         printf 'config key missing: %s\n' "$key"
@@ -951,6 +990,25 @@ compat_check() {
   else
     warn "Could not find playerbots.conf or playerbots.conf.dist. Config compatibility is unknown."
     missing_keys=1
+  fi
+
+  if [[ -n "$runtime_config" && -n "$dist_config" && "$(abs_dir "$(dirname "$runtime_config")")/$(basename "$runtime_config")" != "$(abs_dir "$(dirname "$dist_config")")/$(basename "$dist_config")" ]]; then
+    log "Checking runtime playerbots.conf for keys missing from current playerbots.conf.dist"
+    while IFS= read -r key; do
+      [[ -n "$key" ]] || continue
+      if ! config_has_key "$runtime_config" "$key"; then
+        printf 'dist key missing from runtime config: %s\n' "$key"
+        missing_dist_keys=$((missing_dist_keys + 1))
+      fi
+    done < <(list_config_keys "$dist_config")
+
+    if (( missing_dist_keys > 0 )); then
+      warn "Runtime playerbots.conf is missing $missing_dist_keys keys from playerbots.conf.dist. Consider applying presets with --refresh-config after reviewing backups."
+    else
+      log "Runtime playerbots.conf contains all keys from playerbots.conf.dist."
+    fi
+  elif [[ -z "$runtime_config" && -n "$dist_config" ]]; then
+    warn "No runtime playerbots.conf found. apply-preset can create one from playerbots.conf.dist."
   fi
 
   local override
@@ -990,6 +1048,7 @@ compat_check() {
 
 Compatibility summary:
 - Missing config keys: $missing_keys
+- Dist keys missing from runtime config: $missing_dist_keys
 - Applicable patches: $applicable_patches
 - Already-applied patches: $already_applied_patches
 - Incompatible/unchecked patches: $incompatible_patches
