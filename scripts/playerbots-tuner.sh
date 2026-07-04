@@ -62,6 +62,8 @@ Commands:
   apply-patches lfg       Apply optional Playerbots LFG reliability patches.
   apply-patches arena-lower-brackets
                          Apply experimental lower-level arena bracket patches.
+  apply-patches trade-offers
+                         Apply experimental group trade item offer patches.
   doctor                  Check install layout and important Playerbots settings.
   diagnose-lfg            Show LFG-related config and recent worldserver logs.
   diagnose-pvp            Show PvP-related config and recent worldserver logs.
@@ -91,6 +93,7 @@ Examples:
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --min-bots 300 --max-bots 900
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches arena-lower-brackets --rebuild
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset pvp-arena-2v2-experimental --arena-bracket 2
+  ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches trade-offers --rebuild
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches lfg --rebuild
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots restore-latest --restart
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots doctor
@@ -882,12 +885,17 @@ apply_arena_lower_bracket_patches() {
   apply_patch_dir "$REPO_ROOT/patches/playerbots/arena-lower-brackets" "No arena lower-bracket patch files found"
 }
 
+apply_trade_offer_patches() {
+  apply_patch_dir "$REPO_ROOT/patches/playerbots/trade-offers" "No trade offer patch files found"
+}
+
 apply_patches() {
   local patch_set="${1:-}"
   case "$patch_set" in
     lfg) apply_lfg_patches ;;
     arena-lower-brackets) apply_arena_lower_bracket_patches ;;
-    *) die "Unknown patch set: ${patch_set:-}. Available patch sets: lfg, arena-lower-brackets" ;;
+    trade-offers) apply_trade_offer_patches ;;
+    *) die "Unknown patch set: ${patch_set:-}. Available patch sets: lfg, arena-lower-brackets, trade-offers" ;;
   esac
 }
 
@@ -1059,7 +1067,7 @@ compat_check() {
     log "Checking bundled LFG patch compatibility"
     local patch_file
     shopt -s nullglob
-    local patches=("$REPO_ROOT"/patches/playerbots/*.patch "$REPO_ROOT"/patches/playerbots/arena-lower-brackets/*.patch)
+    local patches=("$REPO_ROOT"/patches/playerbots/*.patch "$REPO_ROOT"/patches/playerbots/arena-lower-brackets/*.patch "$REPO_ROOT"/patches/playerbots/trade-offers/*.patch)
     shopt -u nullglob
     if [[ ${#patches[@]} -eq 0 ]]; then
       warn "No bundled patch files were found."

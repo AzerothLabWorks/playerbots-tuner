@@ -62,3 +62,24 @@ Then configure the experimental 2v2 preset:
 ```
 
 Treat this as experimental and test on a non-production copy first.
+
+## `apply-patches trade-offers`
+
+Experimental patch set for group trade quality-of-life.
+
+When a real player in the bot's group opens a trade with the bot, the bot offers
+up to three tradable items from low-priority inventory categories such as vendor,
+auction house, disenchant, or unused items. The player still controls whether to
+accept the trade.
+
+The patch does not offer items when random bot selling is disabled through
+`AiPlayerbot.EnableRandomBotTrading = 2`.
+
+Apply:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches trade-offers --rebuild
+```
+
+This patch is intentionally opt-in because it changes live trade behavior. Test
+with a non-production character or server first.

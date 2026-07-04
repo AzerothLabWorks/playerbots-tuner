@@ -414,6 +414,20 @@ Apply patches and rebuild:
 The script checks whether each patch can apply cleanly, is already applied, or
 cannot be applied to your installed `mod-playerbots` version.
 
+Optional experimental group trade patch:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots --dry-run apply-patches trade-offers
+```
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches trade-offers --rebuild
+```
+
+This lets a grouped bot offer a few low-priority tradable items when a real
+player opens trade with it. The player still decides whether to accept the trade.
+Because it changes live trade behavior, it is opt-in and experimental.
+
 ## Presets
 
 `quiet-social`
