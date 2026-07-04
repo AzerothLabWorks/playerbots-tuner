@@ -976,3 +976,7 @@ To make bots hold position for quest objectives:
 
 Party persistence after relog is more complicated for roaming random bots. For
 stable long-session party play, prefer altbots or addclass bots where possible.
+
+## License
+
+This project is available under the MIT License. See [LICENSE](LICENSE).
