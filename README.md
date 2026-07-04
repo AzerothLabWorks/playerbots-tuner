@@ -117,6 +117,14 @@ git clone https://github.com/AzerothLabWorks/playerbots-tuner.git
 cd playerbots-tuner
 ```
 
+The script is committed as executable, so Git clone should usually preserve the
+right permissions. If your system says `Permission denied` when running it, fix
+the script permission once:
+
+```bash
+chmod +x scripts/playerbots-tuner.sh
+```
+
 To update later:
 
 ```bash
@@ -132,6 +140,13 @@ https://github.com/AzerothLabWorks/playerbots-tuner
 
 Click `Code`, then `Download ZIP`, extract it, and open a terminal inside the
 extracted folder.
+
+ZIP downloads may not preserve executable permissions. If you downloaded the ZIP,
+run this before using the tuner:
+
+```bash
+chmod +x scripts/playerbots-tuner.sh
+```
 
 ## Step 3: Find Your Server Directory
 
