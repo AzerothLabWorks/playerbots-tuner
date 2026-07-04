@@ -471,7 +471,8 @@ Conservative level-80 rated 3v3 seeding.
 
 `living-server`
 
-Combines dungeon, PvP, and quiet social defaults.
+Combines `dungeon-lfg`, `pvp-bg-progression`, `pvp-3v3`, and quiet social
+defaults. It does not include `pvp-bg-all` or `pvp-arena-2v2-experimental`.
 
 Show presets:
 

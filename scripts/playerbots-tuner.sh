@@ -81,7 +81,7 @@ Presets:
   pvp-arena-2v2-experimental
                          Experimental lower-bracket rated 2v2 arena tuning.
   pvp-3v3                 Conservative level-80 rated 3v3 seeding.
-  living-server           Dungeon + PvP + world social defaults.
+  living-server           Dungeon LFG + BG progression + level-80 3v3 + quiet social defaults.
 
 Examples:
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset solo-controller --restart
@@ -734,7 +734,7 @@ pvp-bg-progression            Conservative BG auto-join across leveling brackets
 pvp-bg-all                    Enable all configured BG brackets; stronger hosts only.
 pvp-arena-2v2-experimental    Experimental lower-bracket rated 2v2 arena tuning.
 pvp-3v3                       Conservative level-80 rated 3v3 seeding.
-living-server                 Dungeon + PvP + world social defaults.
+living-server                 Dungeon LFG + BG progression + level-80 3v3 + quiet social defaults.
 PRESETS
 }
 
