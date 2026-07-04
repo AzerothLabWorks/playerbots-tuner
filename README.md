@@ -335,6 +335,12 @@ Living server defaults:
 ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots --dry-run apply-preset living-server
 ```
 
+More active living server for stronger hosts:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots --dry-run apply-preset living-server-plus
+```
+
 ## Step 6: Apply A Preset
 
 When the dry run looks correct, run the same command without `--dry-run`.
@@ -355,6 +361,12 @@ Living server defaults:
 
 ```bash
 ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset living-server
+```
+
+More active living server for stronger hosts:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset living-server-plus
 ```
 
 Progression battleground tuning:
@@ -473,6 +485,19 @@ Conservative level-80 rated 3v3 seeding.
 
 Combines `dungeon-lfg`, `pvp-bg-progression`, `pvp-3v3`, and quiet social
 defaults. It does not include `pvp-bg-all` or `pvp-arena-2v2-experimental`.
+
+`living-server-plus`
+
+Combines `dungeon-lfg`, `pvp-bg-all`, `pvp-3v3`, and quiet social defaults.
+Use this when the host has enough CPU and memory for broader battleground
+activity.
+
+`living-server-experimental`
+
+Combines `dungeon-lfg`, `pvp-bg-progression`, `pvp-arena-2v2-experimental`,
+and quiet social defaults. This requires `apply-patches arena-lower-brackets`
+and a rebuild before use. It uses the lower-bracket 2v2 arena profile instead
+of `pvp-3v3` because both arena presets control the active arena bracket.
 
 Show presets:
 
@@ -596,6 +621,17 @@ auto-created battle per bracket:
 ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset pvp-bg-all --restart
 ```
 
+If you want one combined preset instead of applying separate dungeon and PvP
+presets, use one of these:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset living-server --restart
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset living-server-plus --restart
+```
+
+Use `living-server` for the safer default. Use `living-server-plus` when you
+want the stronger-host battleground profile included.
+
 Arena progression is different. The upstream Playerbots config currently notes
 that lower-level rated arena brackets require custom code changes. For that
 reason, this tuner keeps arena automation conservative and level-80 focused for
@@ -685,6 +721,13 @@ After the server has deleted/recreated teams, set the preset again without
 This experimental patch changes the random arena team level gates from hardcoded
 level 70+ checks to the configured `AiPlayerbot.RandomBotAutoJoinArenaBracket`
 level range. It should be tested on a non-production copy first.
+
+After the patch is applied and the server is rebuilt, you can also use the
+combined experimental living-server preset:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset living-server-experimental --arena-bracket 4 --restart
+```
 
 ## Useful Commands
 

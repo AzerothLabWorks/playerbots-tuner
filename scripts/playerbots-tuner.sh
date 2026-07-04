@@ -82,6 +82,9 @@ Presets:
                          Experimental lower-bracket rated 2v2 arena tuning.
   pvp-3v3                 Conservative level-80 rated 3v3 seeding.
   living-server           Dungeon LFG + BG progression + level-80 3v3 + quiet social defaults.
+  living-server-plus      Dungeon LFG + all BG brackets + level-80 3v3; stronger hosts only.
+  living-server-experimental
+                         Dungeon LFG + BG progression + experimental lower-bracket 2v2.
 
 Examples:
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset solo-controller --restart
@@ -91,6 +94,7 @@ Examples:
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots repair-config
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --population low --dry-run
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --min-bots 300 --max-bots 900
+  ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset living-server-plus --restart
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches arena-lower-brackets --rebuild
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset pvp-arena-2v2-experimental --arena-bracket 2
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches trade-offers --rebuild
@@ -725,6 +729,20 @@ apply_living_server() {
   apply_pvp_3v3 "$config"
 }
 
+apply_living_server_plus() {
+  local config="$1"
+  apply_dungeon_lfg "$config"
+  apply_pvp_bg_all "$config"
+  apply_pvp_3v3 "$config"
+}
+
+apply_living_server_experimental() {
+  local config="$1"
+  apply_dungeon_lfg "$config"
+  apply_pvp_bg_progression "$config"
+  apply_pvp_arena_2v2_experimental "$config"
+}
+
 list_presets() {
   cat <<'PRESETS'
 quiet-social                  Disable repeated greetings/emotes while preserving useful bot chat.
@@ -735,6 +753,8 @@ pvp-bg-all                    Enable all configured BG brackets; stronger hosts 
 pvp-arena-2v2-experimental    Experimental lower-bracket rated 2v2 arena tuning.
 pvp-3v3                       Conservative level-80 rated 3v3 seeding.
 living-server                 Dungeon LFG + BG progression + level-80 3v3 + quiet social defaults.
+living-server-plus            Dungeon LFG + all BG brackets + level-80 3v3; stronger hosts only.
+living-server-experimental    Dungeon LFG + BG progression + experimental lower-bracket 2v2.
 PRESETS
 }
 
@@ -765,6 +785,8 @@ apply_preset() {
     pvp-arena-2v2-experimental) apply_pvp_arena_2v2_experimental "$config" ;;
     pvp-3v3) apply_pvp_3v3 "$config" ;;
     living-server) apply_living_server "$config" ;;
+    living-server-plus) apply_living_server_plus "$config" ;;
+    living-server-experimental) apply_living_server_experimental "$config" ;;
     *) die "Unknown preset: $preset" ;;
   esac
 
