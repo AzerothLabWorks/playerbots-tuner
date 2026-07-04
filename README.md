@@ -246,6 +246,57 @@ Apply:
 applies the selected tuner preset. Use this when upstream Playerbots adds new
 config keys and your existing runtime config is stale.
 
+## Repair Missing Playerbots Config
+
+Some installers may install or update `mod-playerbots` but never copy:
+
+```text
+playerbots.conf.dist
+```
+
+to:
+
+```text
+playerbots.conf
+```
+
+When that happens, worldserver logs may show messages like:
+
+```text
+Config::LoadFile: Failed open file '/azerothcore/env/dist/etc/modules/playerbots.conf'
+Not found modules config files
+```
+
+You can repair only the missing Playerbots runtime config without applying a
+tuning preset:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots repair-config
+```
+
+Preview first:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots --dry-run repair-config
+```
+
+Repair and restart:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots repair-config --restart
+```
+
+If `playerbots.conf` already exists but is stale after a module update, refresh
+it from the current `.dist` file:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots repair-config --refresh-config --restart
+```
+
+`repair-config` does not tune bot counts, battlegrounds, arenas, LFG, or chat
+settings. It only makes sure the runtime Playerbots config file exists. Run a
+preset afterward if you want tuning changes.
+
 ## Step 5: Preview Changes First
 
 Always run `--dry-run` first. This prints what the tuner would change without

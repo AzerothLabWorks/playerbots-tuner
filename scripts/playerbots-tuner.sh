@@ -57,6 +57,7 @@ Commands:
   list-presets            Show available presets.
   list-populations        Show named bot population sizes.
   compat-check            Check config keys and bundled patch compatibility.
+  repair-config           Create/refresh playerbots.conf from playerbots.conf.dist.
   apply-preset NAME       Apply a config preset.
   apply-patches lfg       Apply optional Playerbots LFG reliability patches.
   apply-patches arena-lower-brackets
@@ -85,6 +86,7 @@ Examples:
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --bots 1000 --dry-run
   ./scripts/playerbots-tuner.sh list-populations
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots compat-check
+  ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots repair-config
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --population low --dry-run
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --min-bots 300 --max-bots 900
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches arena-lower-brackets --rebuild
@@ -140,7 +142,7 @@ parse_args() {
       --arena-teams) ARENA_TEAMS="${2:-}"; shift 2 ;;
       --reset-arena-teams) RESET_ARENA_TEAMS=1; shift ;;
       -h|--help) usage; exit 0 ;;
-      list-presets|list-populations|compat-check|apply-preset|apply-patches|doctor|diagnose-lfg|diagnose-pvp|print-macros|restore-latest|restart|rebuild)
+      list-presets|list-populations|compat-check|repair-config|apply-preset|apply-patches|doctor|diagnose-lfg|diagnose-pvp|print-macros|restore-latest|restart|rebuild)
         [[ -z "$COMMAND" ]] || die "Only one command can be used at a time."
         COMMAND="$1"
         shift
@@ -771,6 +773,40 @@ apply_preset() {
   fi
 }
 
+repair_config() {
+  require_server_dir
+
+  local before_config
+  before_config="$(find_playerbots_config || true)"
+
+  if [[ -n "$before_config" && "$REFRESH_CONFIG" != "1" ]]; then
+    log "Playerbots runtime config already exists: $before_config"
+    log "Use --refresh-config to recreate it from the current playerbots.conf.dist."
+  else
+    local config
+    config="$(ensure_playerbots_config)"
+    if [[ -n "$before_config" && "$REFRESH_CONFIG" == "1" ]]; then
+      if [[ "$DRY_RUN" == "1" ]]; then
+        log "Would refresh Playerbots runtime config: $config"
+      else
+        log "Refreshed Playerbots runtime config: $config"
+      fi
+    else
+      if [[ "$DRY_RUN" == "1" ]]; then
+        log "Would create Playerbots runtime config: $config"
+      else
+        log "Created Playerbots runtime config: $config"
+      fi
+    fi
+  fi
+
+  if [[ "$RESTART" == "1" ]]; then
+    restart_worldserver
+  else
+    log "Restart ac-worldserver if it was running and you want the config loaded now."
+  fi
+}
+
 docker_compose() {
   if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
     docker compose "$@"
@@ -1008,7 +1044,7 @@ compat_check() {
       log "Runtime playerbots.conf contains all keys from playerbots.conf.dist."
     fi
   elif [[ -z "$runtime_config" && -n "$dist_config" ]]; then
-    warn "No runtime playerbots.conf found. apply-preset can create one from playerbots.conf.dist."
+    warn "No runtime playerbots.conf found. Run repair-config to create one from playerbots.conf.dist before tuning."
   fi
 
   local override
@@ -1261,6 +1297,7 @@ main() {
     list-presets) list_presets ;;
     list-populations) list_populations ;;
     compat-check) compat_check ;;
+    repair-config) repair_config ;;
     apply-preset) apply_preset "${COMMAND_ARGS[@]}" ;;
     apply-patches) apply_patches "${COMMAND_ARGS[@]}" ;;
     doctor) doctor ;;
