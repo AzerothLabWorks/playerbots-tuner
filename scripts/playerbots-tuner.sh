@@ -67,6 +67,7 @@ Commands:
   doctor                  Check install layout and important Playerbots settings.
   diagnose-lfg            Show LFG-related config and recent worldserver logs.
   diagnose-pvp            Show PvP-related config and recent worldserver logs.
+  diagnose-population     Show random bot population, activity, and zone-pressure config.
   print-macros            Print useful in-game Playerbots party commands.
   restore-latest          Restore latest tuner backups for config/compose files.
   restart                 Restart ac-worldserver.
@@ -85,6 +86,7 @@ Presets:
   living-server-plus      Dungeon LFG + all BG brackets + level-80 3v3; stronger hosts only.
   living-server-experimental
                          Dungeon LFG + BG progression + experimental lower-bracket 2v2.
+  starter-zone-relief     Reduce starter-zone bot crowding with config-only limits.
 
 Examples:
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset solo-controller --restart
@@ -95,6 +97,7 @@ Examples:
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --population low --dry-run
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --min-bots 300 --max-bots 900
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset living-server-plus --restart
+  ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset starter-zone-relief --restart
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches arena-lower-brackets --rebuild
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset pvp-arena-2v2-experimental --arena-bracket 2
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches trade-offers --rebuild
@@ -149,7 +152,7 @@ parse_args() {
       --arena-teams) ARENA_TEAMS="${2:-}"; shift 2 ;;
       --reset-arena-teams) RESET_ARENA_TEAMS=1; shift ;;
       -h|--help) usage; exit 0 ;;
-      list-presets|list-populations|compat-check|repair-config|apply-preset|apply-patches|doctor|diagnose-lfg|diagnose-pvp|print-macros|restore-latest|restart|rebuild)
+      list-presets|list-populations|compat-check|repair-config|apply-preset|apply-patches|doctor|diagnose-lfg|diagnose-pvp|diagnose-population|print-macros|restore-latest|restart|rebuild)
         [[ -z "$COMMAND" ]] || die "Only one command can be used at a time."
         COMMAND="$1"
         shift
@@ -743,6 +746,31 @@ apply_living_server_experimental() {
   apply_pvp_arena_2v2_experimental "$config"
 }
 
+apply_starter_zone_relief() {
+  local config="$1"
+
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotMinLevelChance" "0.02"
+  set_playerbot_value "$config" "AiPlayerbot.DowngradeMaxLevelBot" "0"
+  set_playerbot_value "$config" "AiPlayerbot.BotActiveAloneForceWhenInZone" "0"
+  set_playerbot_value "$config" "AiPlayerbot.BotActiveAloneForceWhenInRadius" "120"
+
+  set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.1" "8,12"
+  set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.12" "8,12"
+  set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.14" "8,12"
+  set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.85" "8,12"
+  set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.141" "8,12"
+  set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.215" "8,12"
+  set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.3430" "8,12"
+  set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.3524" "8,12"
+
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_MIN_LEVEL_CHANCE" "0.02"
+  set_playerbot_env "AC_AI_PLAYERBOT_DOWNGRADE_MAX_LEVEL_BOT" "0"
+  set_playerbot_env "AC_AI_PLAYERBOT_BOT_ACTIVE_ALONE_FORCE_WHEN_IN_ZONE" "0"
+  set_playerbot_env "AC_AI_PLAYERBOT_BOT_ACTIVE_ALONE_FORCE_WHEN_IN_RADIUS" "120"
+
+  log "Configured starter-zone relief. Existing low-level bots may need time, refresh, or a restart cycle to redistribute."
+}
+
 list_presets() {
   cat <<'PRESETS'
 quiet-social                  Disable repeated greetings/emotes while preserving useful bot chat.
@@ -755,6 +783,7 @@ pvp-3v3                       Conservative level-80 rated 3v3 seeding.
 living-server                 Dungeon LFG + BG progression + level-80 3v3 + quiet social defaults.
 living-server-plus            Dungeon LFG + all BG brackets + level-80 3v3; stronger hosts only.
 living-server-experimental    Dungeon LFG + BG progression + experimental lower-bracket 2v2.
+starter-zone-relief           Reduce starter-zone bot crowding with config-only limits.
 PRESETS
 }
 
@@ -787,6 +816,7 @@ apply_preset() {
     living-server) apply_living_server "$config" ;;
     living-server-plus) apply_living_server_plus "$config" ;;
     living-server-experimental) apply_living_server_experimental "$config" ;;
+    starter-zone-relief) apply_starter_zone_relief "$config" ;;
     *) die "Unknown preset: $preset" ;;
   esac
 
@@ -1259,6 +1289,36 @@ diagnose_pvp() {
   fi
 }
 
+diagnose_population() {
+  require_server_dir
+  local config
+  config="$(find_playerbots_config || true)"
+
+  log "Playerbots population and starter-zone pressure config"
+  grep_config "$config" '^[[:space:]]*AiPlayerbot\.(RandomBotAutologin|MinRandomBots|MaxRandomBots|RandomBotAccountCount|RandomBotMinLevel|RandomBotMaxLevel|SyncLevelWithPlayers|DisableRandomLevels|RandombotStartingLevel|RandomBotMinLevelChance|RandomBotMaxLevelChance|RandomBotFixedLevel|DowngradeMaxLevelBot|EnableNewRpgStrategy|AutoTeleportForLevel|RandomBotMaps|RandomBotTeleportDistance|MinRandomBotTeleportInterval|MaxRandomBotTeleportInterval|MinRandomBotRandomizeTime|MaxRandomBotRandomizeTime|BotActiveAlone|BotActiveAloneDurationSeconds|BotActiveAloneForceWhenInRadius|BotActiveAloneForceWhenInZone|BotActiveAloneForceWhenInMap|BotActiveAloneForceWhenIsFriend|BotActiveAloneForceWhenInGuild|botActiveAloneSmartScale|botActiveAloneSmartScaleWhenMinLevel|botActiveAloneSmartScaleWhenMaxLevel|ZoneBracket\.(1|12|14|85|141|215|3430|3524))[[:space:]]*='
+
+  local override
+  override="$(compose_override_file)"
+  log "Docker override population-related environment"
+  if [[ -f "$override" ]]; then
+    grep -E 'AC_AI_PLAYERBOT_(RANDOM_BOT_AUTOLOGIN|MIN_RANDOM_BOTS|MAX_RANDOM_BOTS|RANDOM_BOT_MIN_LEVEL|RANDOM_BOT_MAX_LEVEL|SYNC_LEVEL_WITH_PLAYERS|RANDOM_BOT_MIN_LEVEL_CHANCE|RANDOM_BOT_MAX_LEVEL_CHANCE|DOWNGRADE_MAX_LEVEL_BOT|BOT_ACTIVE_ALONE|BOT_ACTIVE_ALONE_FORCE_WHEN_IN_RADIUS|BOT_ACTIVE_ALONE_FORCE_WHEN_IN_ZONE|BOT_ACTIVE_ALONE_FORCE_WHEN_IN_MAP|BOT_ACTIVE_ALONE_FORCE_WHEN_IS_FRIEND|BOT_ACTIVE_ALONE_FORCE_WHEN_IN_GUILD)|AC_PLAYERBOTS' "$override" || true
+  else
+    warn "No docker-compose.override.yml found."
+  fi
+
+  cat <<'NOTES'
+
+Notes:
+- Starter-zone brackets shown above are Dun Morogh, Elwynn Forest, Durotar,
+  Tirisfal Glades, Teldrassil, Mulgore, Eversong Woods, and Azuremyst Isle.
+- There is no known config-only max-bots-per-zone cap. The practical levers are
+  total bot count, level distribution, zone brackets, teleport timing, and
+  whether a real player in the same zone forces nearby bots active.
+- Existing low-level bots may remain until they randomize, teleport, refresh, or
+  the server completes a restart/login cycle.
+NOTES
+}
+
 print_macros() {
   cat <<'MACROS'
 Useful Playerbots in-game commands:
@@ -1333,6 +1393,7 @@ main() {
     doctor) doctor ;;
     diagnose-lfg) diagnose_lfg ;;
     diagnose-pvp) diagnose_pvp ;;
+    diagnose-population) diagnose_population ;;
     print-macros) print_macros ;;
     restore-latest) restore_latest ;;
     restart) restart_worldserver ;;

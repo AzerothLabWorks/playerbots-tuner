@@ -52,6 +52,7 @@ Phase 1 config tuning includes:
 - quiet greetings and reduced repeated emotes
 - solo/controller-friendly party behavior
 - random bot population and level range
+- starter-zone crowding relief through low-level distribution, activity, and zone bracket tuning
 - LFG participation and dungeon strategy defaults
 - battleground progression brackets for Warsong Gulch, Arathi Basin, Eye of the Storm, Alterac Valley, and Isle of Conquest
 - tank/healer-biased random bot specs for dungeon queues
@@ -74,7 +75,7 @@ Phase 2 patch support includes:
 
 On Linux, Steam Deck, and WSL, Bash and Git are usually enough to run the script.
 Docker Compose is only required for commands such as `--restart`, `--rebuild`,
-`diagnose-lfg`, and `diagnose-pvp`.
+`diagnose-lfg`, `diagnose-pvp`, and `diagnose-population`.
 
 ## Step 1: Open A Terminal
 
@@ -499,6 +500,12 @@ and quiet social defaults. This requires `apply-patches arena-lower-brackets`
 and a rebuild before use. It uses the lower-bracket 2v2 arena profile instead
 of `pvp-3v3` because both arena presets control the active arena bracket.
 
+`starter-zone-relief`
+
+Reduces starter-zone crowding with config-only tuning. This is a stackable
+preset: apply your normal preset first, such as `living-server`, then apply
+`starter-zone-relief`.
+
 Show presets:
 
 ```bash
@@ -574,6 +581,67 @@ AC_AI_PLAYERBOT_MAX_RANDOM_BOTS: "N"
 ```
 
 unless you use `--skip-compose`.
+
+## Starter-Zone Crowding Relief
+
+If starter areas feel too crowded after the server has been running for a while,
+use `starter-zone-relief` after your normal preset. This preset is intended for
+servers where low-level areas such as Elwynn Forest, Durotar, Teldrassil,
+Mulgore, Dun Morogh, Tirisfal Glades, Eversong Woods, or Azuremyst Isle have too
+many random bots.
+
+Preview the current population and starter-zone pressure settings:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots diagnose-population
+```
+
+Preview the relief preset before changing files:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots --dry-run apply-preset starter-zone-relief
+```
+
+Apply it and restart:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset starter-zone-relief --restart
+```
+
+The preset changes:
+
+```ini
+AiPlayerbot.RandomBotMinLevelChance = 0.02
+AiPlayerbot.DowngradeMaxLevelBot = 0
+AiPlayerbot.BotActiveAloneForceWhenInZone = 0
+AiPlayerbot.BotActiveAloneForceWhenInRadius = 120
+AiPlayerbot.ZoneBracket.1 = 8,12
+AiPlayerbot.ZoneBracket.12 = 8,12
+AiPlayerbot.ZoneBracket.14 = 8,12
+AiPlayerbot.ZoneBracket.85 = 8,12
+AiPlayerbot.ZoneBracket.141 = 8,12
+AiPlayerbot.ZoneBracket.215 = 8,12
+AiPlayerbot.ZoneBracket.3430 = 8,12
+AiPlayerbot.ZoneBracket.3524 = 8,12
+```
+
+What this means:
+
+- Fewer newly randomized bots are forced to the minimum random bot level.
+- Max-level bots are not deliberately downgraded back to the minimum level.
+- A real player in the same starter zone no longer forces every bot in that zone
+  active.
+- Bots still become active when a real player is within 120 yards.
+- Starter zones still have bots, but their configured zone bracket starts at
+  level 8 instead of level 5.
+
+There is no known config-only max-bots-per-zone cap in Playerbots. This preset
+uses the available levers: total population, level distribution, zone brackets,
+teleport behavior, and activity rules.
+
+Existing low-level bots may not disappear instantly. They may need time to
+randomize, teleport, refresh, or complete a restart/login cycle before the world
+fully reflects the new settings.
 
 ## Battleground And Arena Progression
 
@@ -737,6 +805,7 @@ combined experimental living-server preset:
 ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots compat-check
 ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots diagnose-lfg
 ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots diagnose-pvp
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots diagnose-population
 ./scripts/playerbots-tuner.sh print-macros
 ```
 
@@ -790,6 +859,7 @@ Restart-only changes:
 - presets
 - bot counts
 - level ranges
+- starter-zone relief
 - LFG/PvP config
 - chat/greeting behavior
 - follow distance
