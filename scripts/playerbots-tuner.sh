@@ -445,6 +445,33 @@ set_conf_value() {
   fi
 }
 
+get_conf_value() {
+  local file="$1"
+  local key="$2"
+  local default_value="${3:-}"
+
+  [[ -f "$file" ]] || { printf '%s\n' "$default_value"; return 0; }
+
+  local value
+  value="$(awk -F= -v key="$key" '
+    {
+      candidate = $1
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", candidate)
+      if (candidate == key) {
+        value = $0
+        sub(/^[^=]*=/, "", value)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+      }
+    }
+    END {
+      if (value != "")
+        print value
+    }
+  ' "$file")"
+
+  printf '%s\n' "${value:-$default_value}"
+}
+
 ensure_compose_override() {
   local file
   file="$(compose_override_file)"
@@ -748,7 +775,20 @@ apply_living_server_experimental() {
 
 apply_starter_zone_relief() {
   local config="$1"
+  local bot_counts
+  local min_bots
+  local max_bots
+  local min_level="${MIN_LEVEL:-15}"
+  local max_level="${MAX_LEVEL:-80}"
 
+  bot_counts="$(resolve_bot_counts 500 800)"
+  read -r min_bots max_bots <<<"$bot_counts"
+
+  set_playerbot_value "$config" "AiPlayerbot.MinRandomBots" "$min_bots"
+  set_playerbot_value "$config" "AiPlayerbot.MaxRandomBots" "$max_bots"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotMinLevel" "$min_level"
+  set_playerbot_value "$config" "AiPlayerbot.RandomBotMaxLevel" "$max_level"
+  set_playerbot_value "$config" "AiPlayerbot.SyncLevelWithPlayers" "1"
   set_playerbot_value "$config" "AiPlayerbot.RandomBotMinLevelChance" "0.02"
   set_playerbot_value "$config" "AiPlayerbot.DowngradeMaxLevelBot" "0"
   set_playerbot_value "$config" "AiPlayerbot.BotActiveAloneForceWhenInZone" "0"
@@ -763,12 +803,18 @@ apply_starter_zone_relief() {
   set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.3430" "8,12"
   set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.3524" "8,12"
 
+  set_playerbot_env "AC_AI_PLAYERBOT_MIN_RANDOM_BOTS" "$min_bots"
+  set_playerbot_env "AC_AI_PLAYERBOT_MAX_RANDOM_BOTS" "$max_bots"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_MIN_LEVEL" "$min_level"
+  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_MAX_LEVEL" "$max_level"
+  set_playerbot_env "AC_AI_PLAYERBOT_SYNC_LEVEL_WITH_PLAYERS" "1"
   set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_MIN_LEVEL_CHANCE" "0.02"
   set_playerbot_env "AC_AI_PLAYERBOT_DOWNGRADE_MAX_LEVEL_BOT" "0"
   set_playerbot_env "AC_AI_PLAYERBOT_BOT_ACTIVE_ALONE_FORCE_WHEN_IN_ZONE" "0"
   set_playerbot_env "AC_AI_PLAYERBOT_BOT_ACTIVE_ALONE_FORCE_WHEN_IN_RADIUS" "120"
 
-  log "Configured starter-zone relief. Existing low-level bots may need time, refresh, or a restart cycle to redistribute."
+  log "Configured starter-zone relief with $min_bots-$max_bots random bots and random bot levels $min_level-$max_level."
+  log "Existing low-level bots may need time, refresh, or a restart cycle to redistribute."
 }
 
 list_presets() {
@@ -1296,6 +1342,37 @@ diagnose_population() {
 
   log "Playerbots population and starter-zone pressure config"
   grep_config "$config" '^[[:space:]]*AiPlayerbot\.(RandomBotAutologin|MinRandomBots|MaxRandomBots|RandomBotAccountCount|RandomBotMinLevel|RandomBotMaxLevel|SyncLevelWithPlayers|DisableRandomLevels|RandombotStartingLevel|RandomBotMinLevelChance|RandomBotMaxLevelChance|RandomBotFixedLevel|DowngradeMaxLevelBot|EnableNewRpgStrategy|AutoTeleportForLevel|RandomBotMaps|RandomBotTeleportDistance|MinRandomBotTeleportInterval|MaxRandomBotTeleportInterval|MinRandomBotRandomizeTime|MaxRandomBotRandomizeTime|BotActiveAlone|BotActiveAloneDurationSeconds|BotActiveAloneForceWhenInRadius|BotActiveAloneForceWhenInZone|BotActiveAloneForceWhenInMap|BotActiveAloneForceWhenIsFriend|BotActiveAloneForceWhenInGuild|botActiveAloneSmartScale|botActiveAloneSmartScaleWhenMinLevel|botActiveAloneSmartScaleWhenMaxLevel|ZoneBracket\.(1|12|14|85|141|215|3430|3524))[[:space:]]*='
+
+  local min_bots
+  local max_bots
+  local min_level
+  local force_zone
+  local min_level_chance
+  min_bots="$(get_conf_value "$config" "AiPlayerbot.MinRandomBots" "0")"
+  max_bots="$(get_conf_value "$config" "AiPlayerbot.MaxRandomBots" "0")"
+  min_level="$(get_conf_value "$config" "AiPlayerbot.RandomBotMinLevel" "1")"
+  force_zone="$(get_conf_value "$config" "AiPlayerbot.BotActiveAloneForceWhenInZone" "1")"
+  min_level_chance="$(get_conf_value "$config" "AiPlayerbot.RandomBotMinLevelChance" "0.1")"
+
+  if [[ "$max_bots" =~ ^[0-9]+$ && "$max_bots" -gt 1000 ]]; then
+    warn "MaxRandomBots is $max_bots. Starter-zone relief is unlikely to feel strong with more than about 1000 random bots online."
+  fi
+
+  if [[ "$min_bots" =~ ^[0-9]+$ && "$min_bots" -gt 1000 ]]; then
+    warn "MinRandomBots is $min_bots. Consider starter-zone-relief without high bot overrides, or use --population medium/low."
+  fi
+
+  if [[ "$min_level" =~ ^[0-9]+$ && "$min_level" -lt 15 ]]; then
+    warn "RandomBotMinLevel is $min_level. Lower minimum levels can keep more bots eligible for starter and early leveling zones."
+  fi
+
+  if [[ "$force_zone" == "1" ]]; then
+    warn "BotActiveAloneForceWhenInZone is enabled. A real player can keep every bot in the same zone active."
+  fi
+
+  if [[ "$min_level_chance" != "0.02" ]]; then
+    warn "RandomBotMinLevelChance is $min_level_chance. starter-zone-relief sets this to 0.02."
+  fi
 
   local override
   override="$(compose_override_file)"

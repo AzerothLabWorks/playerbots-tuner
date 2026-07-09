@@ -590,6 +590,10 @@ servers where low-level areas such as Elwynn Forest, Durotar, Teldrassil,
 Mulgore, Dun Morogh, Tirisfal Glades, Eversong Woods, or Azuremyst Isle have too
 many random bots.
 
+This preset intentionally lowers the random bot population to `500-800` by
+default. In testing feedback, zone bracket changes were not enough when the
+server was still configured for `1500-2000` random bots.
+
 Preview the current population and starter-zone pressure settings:
 
 ```bash
@@ -611,6 +615,11 @@ Apply it and restart:
 The preset changes:
 
 ```ini
+AiPlayerbot.MinRandomBots = 500
+AiPlayerbot.MaxRandomBots = 800
+AiPlayerbot.RandomBotMinLevel = 15
+AiPlayerbot.RandomBotMaxLevel = 80
+AiPlayerbot.SyncLevelWithPlayers = 1
 AiPlayerbot.RandomBotMinLevelChance = 0.02
 AiPlayerbot.DowngradeMaxLevelBot = 0
 AiPlayerbot.BotActiveAloneForceWhenInZone = 0
@@ -627,6 +636,10 @@ AiPlayerbot.ZoneBracket.3524 = 8,12
 
 What this means:
 
+- Online random bot count is reduced unless you override it with `--population`,
+  `--bots`, `--min-bots`, or `--max-bots`.
+- Newly randomized bots default to level 15-80, which keeps new random bots out
+  of true starter-zone level ranges.
 - Fewer newly randomized bots are forced to the minimum random bot level.
 - Max-level bots are not deliberately downgraded back to the minimum level.
 - A real player in the same starter zone no longer forces every bot in that zone
@@ -642,6 +655,13 @@ teleport behavior, and activity rules.
 Existing low-level bots may not disappear instantly. They may need time to
 randomize, teleport, refresh, or complete a restart/login cycle before the world
 fully reflects the new settings.
+
+For a stronger or weaker version, override the population:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset starter-zone-relief --population low --restart
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset starter-zone-relief --population medium --restart
+```
 
 ## Battleground And Arena Progression
 
