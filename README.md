@@ -52,7 +52,6 @@ Phase 1 config tuning includes:
 - quiet greetings and reduced repeated emotes
 - solo/controller-friendly party behavior
 - random bot population and level range
-- starter-zone crowding relief through low-level distribution, activity, and zone bracket tuning
 - LFG participation and dungeon strategy defaults
 - battleground progression brackets for Warsong Gulch, Arathi Basin, Eye of the Storm, Alterac Valley, and Isle of Conquest
 - tank/healer-biased random bot specs for dungeon queues
@@ -65,6 +64,7 @@ Phase 2 patch support includes:
 
 - accepting LFG proposals even when bots are busy, dead, or in combat
 - retrying native LFG dungeon teleport when an accepted bot remains outside
+- optional random bot zone-density caps for starter and early leveling zones
 
 ## Requirements
 
@@ -500,11 +500,10 @@ and quiet social defaults. This requires `apply-patches arena-lower-brackets`
 and a rebuild before use. It uses the lower-bracket 2v2 arena profile instead
 of `pvp-3v3` because both arena presets control the active arena bracket.
 
-`starter-zone-relief`
+`zone-density-starter`
 
-Reduces starter-zone crowding with config-only tuning. This is a stackable
-preset: apply your normal preset first, such as `living-server`, then apply
-`starter-zone-relief`.
+Enables the optional patched zone-density controls for starter and early
+leveling zones. Requires `apply-patches zone-density` and a rebuild before use.
 
 Show presets:
 
@@ -582,17 +581,16 @@ AC_AI_PLAYERBOT_MAX_RANDOM_BOTS: "N"
 
 unless you use `--skip-compose`.
 
-## Starter-Zone Crowding Relief
+## Starter And Early-Zone Density
 
-If starter areas feel too crowded after the server has been running for a while,
-use `starter-zone-relief` after your normal preset. This preset is intended for
-servers where low-level areas such as Elwynn Forest, Durotar, Teldrassil,
-Mulgore, Dun Morogh, Tirisfal Glades, Eversong Woods, or Azuremyst Isle have too
-many random bots.
+High random bot counts can make the world feel alive, but small starter zones
+can saturate before the rest of the world feels properly populated. The
+config-only tuner cannot enforce a max-bots-per-zone cap, so the better fix is
+the optional `zone-density` patch workflow.
 
-This preset intentionally lowers the random bot population to `500-800` by
-default. In testing feedback, zone bracket changes were not enough when the
-server was still configured for `1500-2000` random bots.
+This workflow keeps global random bot counts intact. It adds patched config keys
+that tell Playerbots to skip starter or early-zone teleport destinations that
+already have enough random bots.
 
 Preview the current population and starter-zone pressure settings:
 
@@ -600,68 +598,48 @@ Preview the current population and starter-zone pressure settings:
 ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots diagnose-population
 ```
 
-Preview the relief preset before changing files:
+Preview the patch:
 
 ```bash
-./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots --dry-run apply-preset starter-zone-relief
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots --dry-run apply-patches zone-density
 ```
 
-Apply it and restart:
+Apply the patch and rebuild:
 
 ```bash
-./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset starter-zone-relief --restart
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches zone-density --rebuild
 ```
 
-The preset changes:
+Then enable the starter/early-zone density caps:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset zone-density-starter --restart
+```
+
+The config preset changes:
 
 ```ini
-AiPlayerbot.MinRandomBots = 500
-AiPlayerbot.MaxRandomBots = 800
-AiPlayerbot.RandomBotMinLevel = 15
-AiPlayerbot.RandomBotMaxLevel = 80
-AiPlayerbot.SyncLevelWithPlayers = 1
-AiPlayerbot.RandomBotMinLevelChance = 0.02
-AiPlayerbot.DowngradeMaxLevelBot = 0
-AiPlayerbot.BotActiveAloneForceWhenInZone = 0
-AiPlayerbot.BotActiveAloneForceWhenInRadius = 120
-AiPlayerbot.ZoneBracket.1 = 8,12
-AiPlayerbot.ZoneBracket.12 = 8,12
-AiPlayerbot.ZoneBracket.14 = 8,12
-AiPlayerbot.ZoneBracket.85 = 8,12
-AiPlayerbot.ZoneBracket.141 = 8,12
-AiPlayerbot.ZoneBracket.215 = 8,12
-AiPlayerbot.ZoneBracket.3430 = 8,12
-AiPlayerbot.ZoneBracket.3524 = 8,12
+AiPlayerbot.ZoneDensity.Enabled = 1
+AiPlayerbot.ZoneDensity.StarterZoneLimit = 20
+AiPlayerbot.ZoneDensity.EarlyZoneLimit = 45
+AiPlayerbot.ZoneDensity.StarterZones = "1,12,14,85,141,215,3430,3524"
+AiPlayerbot.ZoneDensity.EarlyZones = "17,38,40,130,148,3433,3525"
 ```
 
 What this means:
 
-- Online random bot count is reduced unless you override it with `--population`,
-  `--bots`, `--min-bots`, or `--max-bots`.
-- Newly randomized bots default to level 15-80, which keeps new random bots out
-  of true starter-zone level ranges.
-- Fewer newly randomized bots are forced to the minimum random bot level.
-- Max-level bots are not deliberately downgraded back to the minimum level.
-- A real player in the same starter zone no longer forces every bot in that zone
-  active.
-- Bots still become active when a real player is within 120 yards.
-- Starter zones still have bots, but their configured zone bracket starts at
-  level 8 instead of level 5.
+- Starter zones are capped at 20 random bots by default.
+- Early leveling zones are capped at 45 random bots by default.
+- Global `MinRandomBots` and `MaxRandomBots` are not reduced.
+- The cap applies when random bots choose teleport destinations. It does not
+  instantly delete bots already standing in a zone.
+- Existing bots may need time to teleport, randomize, refresh, or complete a
+  restart/login cycle before the new density pattern is obvious.
 
-There is no known config-only max-bots-per-zone cap in Playerbots. This preset
-uses the available levers: total population, level distribution, zone brackets,
-teleport behavior, and activity rules.
-
-Existing low-level bots may not disappear instantly. They may need time to
-randomize, teleport, refresh, or complete a restart/login cycle before the world
-fully reflects the new settings.
-
-For a stronger or weaker version, override the population:
-
-```bash
-./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset starter-zone-relief --population low --restart
-./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset starter-zone-relief --population medium --restart
-```
+Starter zones are Dun Morogh, Elwynn Forest, Durotar, Tirisfal Glades,
+Teldrassil, Mulgore, Eversong Woods, and Azuremyst Isle. Early zones are the
+Barrens, Loch Modan, Westfall, Silverpine Forest, Darkshore, Ghostlands, and
+Bloodmyst Isle.
 
 ## Battleground And Arena Progression
 
@@ -879,7 +857,7 @@ Restart-only changes:
 - presets
 - bot counts
 - level ranges
-- starter-zone relief
+- `zone-density-starter` config after the `zone-density` patch is already built
 - LFG/PvP config
 - chat/greeting behavior
 - follow distance
@@ -889,6 +867,7 @@ Restart-only changes:
 Rebuild-required changes:
 
 - `apply-patches lfg`
+- `apply-patches zone-density`
 - any future C++ behavior patch
 
 ## WSL Notes

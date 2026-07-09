@@ -1,0 +1,121 @@
+diff --git a/modules/mod-playerbots/conf/playerbots.conf.dist b/modules/mod-playerbots/conf/playerbots.conf.dist
+index 711d0ff..c2d93f5 100644
+--- a/modules/mod-playerbots/conf/playerbots.conf.dist
++++ b/modules/mod-playerbots/conf/playerbots.conf.dist
+@@ -1216,6 +1216,16 @@ AiPlayerbot.ZoneBracket.4197 = 79,80
+ # Defaults: 0 = Eastern Kingdoms, 1 = Kalimdor, 530 = Outland, 571 = Northrend
+ AiPlayerbot.RandomBotMaps = 0,1,530,571
+ 
++# Optional random bot zone density caps. When enabled, random bot teleport
++# location selection skips capped zones that already have enough random bots.
++# This keeps small starter and early leveling zones from saturating while
++# allowing high global random bot counts.
++AiPlayerbot.ZoneDensity.Enabled = 0
++AiPlayerbot.ZoneDensity.StarterZoneLimit = 20
++AiPlayerbot.ZoneDensity.EarlyZoneLimit = 45
++AiPlayerbot.ZoneDensity.StarterZones = "1,12,14,85,141,215,3430,3524"
++AiPlayerbot.ZoneDensity.EarlyZones = "17,38,40,130,148,3433,3525"
++
+ # Probability bots teleport to banker (city)
+ # Default: 0.25
+ AiPlayerbot.ProbTeleToBankers = 0.25
+diff --git a/modules/mod-playerbots/src/Bot/RandomPlayerbotMgr.cpp b/modules/mod-playerbots/src/Bot/RandomPlayerbotMgr.cpp
+index a1064b4..edd0cfb 100644
+--- a/modules/mod-playerbots/src/Bot/RandomPlayerbotMgr.cpp
++++ b/modules/mod-playerbots/src/Bot/RandomPlayerbotMgr.cpp
+@@ -1574,6 +1574,40 @@ void RandomPlayerbotMgr::Revive(Player* player)
+     RandomTeleportGrindForLevel(player);
+ }
+ 
++uint32 RandomPlayerbotMgr::CountRandomBotsInZone(uint32 zoneId)
++{
++    uint32 count = 0;
++    for (PlayerBotMap::const_iterator itr = GetPlayerBotsBegin(); itr != GetPlayerBotsEnd(); ++itr)
++    {
++        Player* bot = itr->second;
++        if (!bot || !bot->IsInWorld() || !IsRandomBot(bot))
++            continue;
++
++        if (bot->GetZoneId() == zoneId)
++            ++count;
++    }
++
++    return count;
++}
++
++bool RandomPlayerbotMgr::IsZoneOverDensityLimit(uint32 zoneId)
++{
++    if (!sPlayerbotAIConfig.zoneDensityEnabled)
++        return false;
++
++    if (std::find(sPlayerbotAIConfig.zoneDensityStarterZones.begin(),
++                  sPlayerbotAIConfig.zoneDensityStarterZones.end(), zoneId) !=
++        sPlayerbotAIConfig.zoneDensityStarterZones.end())
++        return CountRandomBotsInZone(zoneId) >= sPlayerbotAIConfig.zoneDensityStarterLimit;
++
++    if (std::find(sPlayerbotAIConfig.zoneDensityEarlyZones.begin(),
++                  sPlayerbotAIConfig.zoneDensityEarlyZones.end(), zoneId) !=
++        sPlayerbotAIConfig.zoneDensityEarlyZones.end())
++        return CountRandomBotsInZone(zoneId) >= sPlayerbotAIConfig.zoneDensityEarlyLimit;
++
++    return false;
++}
++
+ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation>& locs, bool hearth)
+ {
+     // ignore when alrdy teleported or not in the world yet.
+@@ -1665,6 +1699,9 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation>&
+         if (zone->team == 2 && bot->GetTeamId() == TEAM_HORDE)
+             continue;
+ 
++        if (IsZoneOverDensityLimit(zone->ID))
++            continue;
++
+         if (map->IsInWater(bot->GetPhaseMask(), x, y, z, bot->GetCollisionHeight()))
+             continue;
+ 
+diff --git a/modules/mod-playerbots/src/Bot/RandomPlayerbotMgr.h b/modules/mod-playerbots/src/Bot/RandomPlayerbotMgr.h
+index 91fcebb..3f22460 100644
+--- a/modules/mod-playerbots/src/Bot/RandomPlayerbotMgr.h
++++ b/modules/mod-playerbots/src/Bot/RandomPlayerbotMgr.h
+@@ -237,6 +237,8 @@ private:
+     void ScheduleRandomize(uint32 bot, uint32 time);
+     void RandomTeleport(Player* bot);
+     void RandomTeleport(Player* bot, std::vector<WorldLocation>& locs, bool hearth = false);
++    uint32 CountRandomBotsInZone(uint32 zoneId);
++    bool IsZoneOverDensityLimit(uint32 zoneId);
+     uint32 GetZoneLevel(uint16 mapId, float teleX, float teleY, float teleZ);
+     typedef void (RandomPlayerbotMgr::*ConsoleCommandHandler)(Player*);
+     std::vector<Player*> players;
+diff --git a/modules/mod-playerbots/src/PlayerbotAIConfig.cpp b/modules/mod-playerbots/src/PlayerbotAIConfig.cpp
+index 59293f6..6def944 100644
+--- a/modules/mod-playerbots/src/PlayerbotAIConfig.cpp
++++ b/modules/mod-playerbots/src/PlayerbotAIConfig.cpp
+@@ -171,6 +171,13 @@ bool PlayerbotAIConfig::Initialize()
+ 
+     randomBotMapsAsString = sConfigMgr->GetOption<std::string>("AiPlayerbot.RandomBotMaps", "0,1,530,571");
+     LoadList<std::vector<uint32>>(randomBotMapsAsString, randomBotMaps);
++    zoneDensityEnabled = sConfigMgr->GetOption<bool>("AiPlayerbot.ZoneDensity.Enabled", false);
++    zoneDensityStarterLimit = sConfigMgr->GetOption<uint32>("AiPlayerbot.ZoneDensity.StarterZoneLimit", 20);
++    zoneDensityEarlyLimit = sConfigMgr->GetOption<uint32>("AiPlayerbot.ZoneDensity.EarlyZoneLimit", 45);
++    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>(
++        "AiPlayerbot.ZoneDensity.StarterZones", "1,12,14,85,141,215,3430,3524"), zoneDensityStarterZones);
++    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>(
++        "AiPlayerbot.ZoneDensity.EarlyZones", "17,38,40,130,148,3433,3525"), zoneDensityEarlyZones);
+     probTeleToBankers = sConfigMgr->GetOption<float>("AiPlayerbot.ProbTeleToBankers", 0.25f);
+     enableWeightTeleToCityBankers = sConfigMgr->GetOption<bool>("AiPlayerbot.EnableWeightTeleToCityBankers", false);
+     weightTeleToStormwind = sConfigMgr->GetOption<int>("AiPlayerbot.TeleToStormwindWeight", 2);
+diff --git a/modules/mod-playerbots/src/PlayerbotAIConfig.h b/modules/mod-playerbots/src/PlayerbotAIConfig.h
+index 91606f8..b06944a 100644
+--- a/modules/mod-playerbots/src/PlayerbotAIConfig.h
++++ b/modules/mod-playerbots/src/PlayerbotAIConfig.h
+@@ -135,6 +135,9 @@ public:
+     std::vector<uint32> randomBotSpellIds;
+     std::vector<uint32> randomBotQuestIds;
+     uint32 randomBotTeleportDistance;
++    bool zoneDensityEnabled;
++    uint32 zoneDensityStarterLimit, zoneDensityEarlyLimit;
++    std::vector<uint32> zoneDensityStarterZones, zoneDensityEarlyZones;
+     float randomGearLoweringChance;
+     int32 randomGearQualityLimit;
+     int32 randomGearScoreLimit;

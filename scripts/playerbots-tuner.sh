@@ -64,6 +64,8 @@ Commands:
                          Apply experimental lower-level arena bracket patches.
   apply-patches trade-offers
                          Apply experimental group trade item offer patches.
+  apply-patches zone-density
+                         Apply experimental random bot zone density patches.
   doctor                  Check install layout and important Playerbots settings.
   diagnose-lfg            Show LFG-related config and recent worldserver logs.
   diagnose-pvp            Show PvP-related config and recent worldserver logs.
@@ -86,7 +88,7 @@ Presets:
   living-server-plus      Dungeon LFG + all BG brackets + level-80 3v3; stronger hosts only.
   living-server-experimental
                          Dungeon LFG + BG progression + experimental lower-bracket 2v2.
-  starter-zone-relief     Reduce starter-zone bot crowding with config-only limits.
+  zone-density-starter    Enable patched starter/early-zone bot density caps.
 
 Examples:
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset solo-controller --restart
@@ -97,7 +99,8 @@ Examples:
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --population low --dry-run
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset dungeon-lfg --min-bots 300 --max-bots 900
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset living-server-plus --restart
-  ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset starter-zone-relief --restart
+  ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches zone-density --rebuild
+  ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset zone-density-starter --restart
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches arena-lower-brackets --rebuild
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset pvp-arena-2v2-experimental --arena-bracket 2
   ./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches trade-offers --rebuild
@@ -773,48 +776,20 @@ apply_living_server_experimental() {
   apply_pvp_arena_2v2_experimental "$config"
 }
 
-apply_starter_zone_relief() {
+apply_zone_density_starter() {
   local config="$1"
-  local bot_counts
-  local min_bots
-  local max_bots
-  local min_level="${MIN_LEVEL:-15}"
-  local max_level="${MAX_LEVEL:-80}"
 
-  bot_counts="$(resolve_bot_counts 500 800)"
-  read -r min_bots max_bots <<<"$bot_counts"
+  set_playerbot_value "$config" "AiPlayerbot.ZoneDensity.Enabled" "1"
+  set_playerbot_value "$config" "AiPlayerbot.ZoneDensity.StarterZoneLimit" "20"
+  set_playerbot_value "$config" "AiPlayerbot.ZoneDensity.EarlyZoneLimit" "45"
+  set_playerbot_value "$config" "AiPlayerbot.ZoneDensity.StarterZones" "\"1,12,14,85,141,215,3430,3524\""
+  set_playerbot_value "$config" "AiPlayerbot.ZoneDensity.EarlyZones" "\"17,38,40,130,148,3433,3525\""
 
-  set_playerbot_value "$config" "AiPlayerbot.MinRandomBots" "$min_bots"
-  set_playerbot_value "$config" "AiPlayerbot.MaxRandomBots" "$max_bots"
-  set_playerbot_value "$config" "AiPlayerbot.RandomBotMinLevel" "$min_level"
-  set_playerbot_value "$config" "AiPlayerbot.RandomBotMaxLevel" "$max_level"
-  set_playerbot_value "$config" "AiPlayerbot.SyncLevelWithPlayers" "1"
-  set_playerbot_value "$config" "AiPlayerbot.RandomBotMinLevelChance" "0.02"
-  set_playerbot_value "$config" "AiPlayerbot.DowngradeMaxLevelBot" "0"
-  set_playerbot_value "$config" "AiPlayerbot.BotActiveAloneForceWhenInZone" "0"
-  set_playerbot_value "$config" "AiPlayerbot.BotActiveAloneForceWhenInRadius" "120"
+  set_playerbot_env "AC_AI_PLAYERBOT_ZONE_DENSITY_ENABLED" "1"
+  set_playerbot_env "AC_AI_PLAYERBOT_ZONE_DENSITY_STARTER_ZONE_LIMIT" "20"
+  set_playerbot_env "AC_AI_PLAYERBOT_ZONE_DENSITY_EARLY_ZONE_LIMIT" "45"
 
-  set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.1" "8,12"
-  set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.12" "8,12"
-  set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.14" "8,12"
-  set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.85" "8,12"
-  set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.141" "8,12"
-  set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.215" "8,12"
-  set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.3430" "8,12"
-  set_playerbot_value "$config" "AiPlayerbot.ZoneBracket.3524" "8,12"
-
-  set_playerbot_env "AC_AI_PLAYERBOT_MIN_RANDOM_BOTS" "$min_bots"
-  set_playerbot_env "AC_AI_PLAYERBOT_MAX_RANDOM_BOTS" "$max_bots"
-  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_MIN_LEVEL" "$min_level"
-  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_MAX_LEVEL" "$max_level"
-  set_playerbot_env "AC_AI_PLAYERBOT_SYNC_LEVEL_WITH_PLAYERS" "1"
-  set_playerbot_env "AC_AI_PLAYERBOT_RANDOM_BOT_MIN_LEVEL_CHANCE" "0.02"
-  set_playerbot_env "AC_AI_PLAYERBOT_DOWNGRADE_MAX_LEVEL_BOT" "0"
-  set_playerbot_env "AC_AI_PLAYERBOT_BOT_ACTIVE_ALONE_FORCE_WHEN_IN_ZONE" "0"
-  set_playerbot_env "AC_AI_PLAYERBOT_BOT_ACTIVE_ALONE_FORCE_WHEN_IN_RADIUS" "120"
-
-  log "Configured starter-zone relief with $min_bots-$max_bots random bots and random bot levels $min_level-$max_level."
-  log "Existing low-level bots may need time, refresh, or a restart cycle to redistribute."
+  log "Configured patched zone density caps without changing global random bot count."
 }
 
 list_presets() {
@@ -829,7 +804,7 @@ pvp-3v3                       Conservative level-80 rated 3v3 seeding.
 living-server                 Dungeon LFG + BG progression + level-80 3v3 + quiet social defaults.
 living-server-plus            Dungeon LFG + all BG brackets + level-80 3v3; stronger hosts only.
 living-server-experimental    Dungeon LFG + BG progression + experimental lower-bracket 2v2.
-starter-zone-relief           Reduce starter-zone bot crowding with config-only limits.
+zone-density-starter          Enable patched starter/early-zone bot density caps.
 PRESETS
 }
 
@@ -862,7 +837,7 @@ apply_preset() {
     living-server) apply_living_server "$config" ;;
     living-server-plus) apply_living_server_plus "$config" ;;
     living-server-experimental) apply_living_server_experimental "$config" ;;
-    starter-zone-relief) apply_starter_zone_relief "$config" ;;
+    zone-density-starter) apply_zone_density_starter "$config" ;;
     *) die "Unknown preset: $preset" ;;
   esac
 
@@ -987,13 +962,18 @@ apply_trade_offer_patches() {
   apply_patch_dir "$REPO_ROOT/patches/playerbots/trade-offers" "No trade offer patch files found"
 }
 
+apply_zone_density_patches() {
+  apply_patch_dir "$REPO_ROOT/patches/playerbots/zone-density" "No zone density patch files found"
+}
+
 apply_patches() {
   local patch_set="${1:-}"
   case "$patch_set" in
     lfg) apply_lfg_patches ;;
     arena-lower-brackets) apply_arena_lower_bracket_patches ;;
     trade-offers) apply_trade_offer_patches ;;
-    *) die "Unknown patch set: ${patch_set:-}. Available patch sets: lfg, arena-lower-brackets, trade-offers" ;;
+    zone-density) apply_zone_density_patches ;;
+    *) die "Unknown patch set: ${patch_set:-}. Available patch sets: lfg, arena-lower-brackets, trade-offers, zone-density" ;;
   esac
 }
 
@@ -1162,10 +1142,10 @@ compat_check() {
   fi
 
   if is_git_root "$SERVER_DIR"; then
-    log "Checking bundled LFG patch compatibility"
+    log "Checking bundled Playerbots patch compatibility"
     local patch_file
     shopt -s nullglob
-    local patches=("$REPO_ROOT"/patches/playerbots/*.patch "$REPO_ROOT"/patches/playerbots/arena-lower-brackets/*.patch "$REPO_ROOT"/patches/playerbots/trade-offers/*.patch)
+    local patches=("$REPO_ROOT"/patches/playerbots/*.patch "$REPO_ROOT"/patches/playerbots/arena-lower-brackets/*.patch "$REPO_ROOT"/patches/playerbots/trade-offers/*.patch "$REPO_ROOT"/patches/playerbots/zone-density/*.patch)
     shopt -u nullglob
     if [[ ${#patches[@]} -eq 0 ]]; then
       warn "No bundled patch files were found."
@@ -1341,25 +1321,23 @@ diagnose_population() {
   config="$(find_playerbots_config || true)"
 
   log "Playerbots population and starter-zone pressure config"
-  grep_config "$config" '^[[:space:]]*AiPlayerbot\.(RandomBotAutologin|MinRandomBots|MaxRandomBots|RandomBotAccountCount|RandomBotMinLevel|RandomBotMaxLevel|SyncLevelWithPlayers|DisableRandomLevels|RandombotStartingLevel|RandomBotMinLevelChance|RandomBotMaxLevelChance|RandomBotFixedLevel|DowngradeMaxLevelBot|EnableNewRpgStrategy|AutoTeleportForLevel|RandomBotMaps|RandomBotTeleportDistance|MinRandomBotTeleportInterval|MaxRandomBotTeleportInterval|MinRandomBotRandomizeTime|MaxRandomBotRandomizeTime|BotActiveAlone|BotActiveAloneDurationSeconds|BotActiveAloneForceWhenInRadius|BotActiveAloneForceWhenInZone|BotActiveAloneForceWhenInMap|BotActiveAloneForceWhenIsFriend|BotActiveAloneForceWhenInGuild|botActiveAloneSmartScale|botActiveAloneSmartScaleWhenMinLevel|botActiveAloneSmartScaleWhenMaxLevel|ZoneBracket\.(1|12|14|85|141|215|3430|3524))[[:space:]]*='
+  grep_config "$config" '^[[:space:]]*AiPlayerbot\.(RandomBotAutologin|MinRandomBots|MaxRandomBots|RandomBotAccountCount|RandomBotMinLevel|RandomBotMaxLevel|SyncLevelWithPlayers|DisableRandomLevels|RandombotStartingLevel|RandomBotMinLevelChance|RandomBotMaxLevelChance|RandomBotFixedLevel|DowngradeMaxLevelBot|EnableNewRpgStrategy|AutoTeleportForLevel|RandomBotMaps|RandomBotTeleportDistance|MinRandomBotTeleportInterval|MaxRandomBotTeleportInterval|MinRandomBotRandomizeTime|MaxRandomBotRandomizeTime|BotActiveAlone|BotActiveAloneDurationSeconds|BotActiveAloneForceWhenInRadius|BotActiveAloneForceWhenInZone|BotActiveAloneForceWhenInMap|BotActiveAloneForceWhenIsFriend|BotActiveAloneForceWhenInGuild|botActiveAloneSmartScale|botActiveAloneSmartScaleWhenMinLevel|botActiveAloneSmartScaleWhenMaxLevel|ZoneDensity\.(Enabled|StarterZoneLimit|EarlyZoneLimit|StarterZones|EarlyZones)|ZoneBracket\.(1|12|14|85|141|215|3430|3524))[[:space:]]*='
 
   local min_bots
   local max_bots
   local min_level
   local force_zone
   local min_level_chance
+  local zone_density_enabled
   min_bots="$(get_conf_value "$config" "AiPlayerbot.MinRandomBots" "0")"
   max_bots="$(get_conf_value "$config" "AiPlayerbot.MaxRandomBots" "0")"
   min_level="$(get_conf_value "$config" "AiPlayerbot.RandomBotMinLevel" "1")"
   force_zone="$(get_conf_value "$config" "AiPlayerbot.BotActiveAloneForceWhenInZone" "1")"
   min_level_chance="$(get_conf_value "$config" "AiPlayerbot.RandomBotMinLevelChance" "0.1")"
+  zone_density_enabled="$(get_conf_value "$config" "AiPlayerbot.ZoneDensity.Enabled" "0")"
 
-  if [[ "$max_bots" =~ ^[0-9]+$ && "$max_bots" -gt 1000 ]]; then
-    warn "MaxRandomBots is $max_bots. Starter-zone relief is unlikely to feel strong with more than about 1000 random bots online."
-  fi
-
-  if [[ "$min_bots" =~ ^[0-9]+$ && "$min_bots" -gt 1000 ]]; then
-    warn "MinRandomBots is $min_bots. Consider starter-zone-relief without high bot overrides, or use --population medium/low."
+  if [[ "$max_bots" =~ ^[0-9]+$ && "$max_bots" -gt 1000 && "$zone_density_enabled" != "1" ]]; then
+    warn "MaxRandomBots is $max_bots and ZoneDensity is not enabled. High global populations can saturate small starter zones without the zone-density patch workflow."
   fi
 
   if [[ "$min_level" =~ ^[0-9]+$ && "$min_level" -lt 15 ]]; then
@@ -1371,14 +1349,18 @@ diagnose_population() {
   fi
 
   if [[ "$min_level_chance" != "0.02" ]]; then
-    warn "RandomBotMinLevelChance is $min_level_chance. starter-zone-relief sets this to 0.02."
+    warn "RandomBotMinLevelChance is $min_level_chance. Lower values reduce the number of newly randomized bots forced to the minimum random bot level."
+  fi
+
+  if [[ "$zone_density_enabled" != "1" ]]; then
+    warn "ZoneDensity is not enabled. Apply the zone-density patch, rebuild, then run apply-preset zone-density-starter."
   fi
 
   local override
   override="$(compose_override_file)"
   log "Docker override population-related environment"
   if [[ -f "$override" ]]; then
-    grep -E 'AC_AI_PLAYERBOT_(RANDOM_BOT_AUTOLOGIN|MIN_RANDOM_BOTS|MAX_RANDOM_BOTS|RANDOM_BOT_MIN_LEVEL|RANDOM_BOT_MAX_LEVEL|SYNC_LEVEL_WITH_PLAYERS|RANDOM_BOT_MIN_LEVEL_CHANCE|RANDOM_BOT_MAX_LEVEL_CHANCE|DOWNGRADE_MAX_LEVEL_BOT|BOT_ACTIVE_ALONE|BOT_ACTIVE_ALONE_FORCE_WHEN_IN_RADIUS|BOT_ACTIVE_ALONE_FORCE_WHEN_IN_ZONE|BOT_ACTIVE_ALONE_FORCE_WHEN_IN_MAP|BOT_ACTIVE_ALONE_FORCE_WHEN_IS_FRIEND|BOT_ACTIVE_ALONE_FORCE_WHEN_IN_GUILD)|AC_PLAYERBOTS' "$override" || true
+    grep -E 'AC_AI_PLAYERBOT_(RANDOM_BOT_AUTOLOGIN|MIN_RANDOM_BOTS|MAX_RANDOM_BOTS|RANDOM_BOT_MIN_LEVEL|RANDOM_BOT_MAX_LEVEL|SYNC_LEVEL_WITH_PLAYERS|RANDOM_BOT_MIN_LEVEL_CHANCE|RANDOM_BOT_MAX_LEVEL_CHANCE|DOWNGRADE_MAX_LEVEL_BOT|BOT_ACTIVE_ALONE|BOT_ACTIVE_ALONE_FORCE_WHEN_IN_RADIUS|BOT_ACTIVE_ALONE_FORCE_WHEN_IN_ZONE|BOT_ACTIVE_ALONE_FORCE_WHEN_IN_MAP|BOT_ACTIVE_ALONE_FORCE_WHEN_IS_FRIEND|BOT_ACTIVE_ALONE_FORCE_WHEN_IN_GUILD|ZONE_DENSITY)|AC_PLAYERBOTS' "$override" || true
   else
     warn "No docker-compose.override.yml found."
   fi
@@ -1388,9 +1370,8 @@ diagnose_population() {
 Notes:
 - Starter-zone brackets shown above are Dun Morogh, Elwynn Forest, Durotar,
   Tirisfal Glades, Teldrassil, Mulgore, Eversong Woods, and Azuremyst Isle.
-- There is no known config-only max-bots-per-zone cap. The practical levers are
-  total bot count, level distribution, zone brackets, teleport timing, and
-  whether a real player in the same zone forces nearby bots active.
+- Config-only tuning cannot enforce max bots per zone. The optional zone-density
+  patch adds a teleport destination cap for configured starter and early zones.
 - Existing low-level bots may remain until they randomize, teleport, refresh, or
   the server completes a restart/login cycle.
 NOTES

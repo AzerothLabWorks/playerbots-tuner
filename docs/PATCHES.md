@@ -83,3 +83,37 @@ Apply:
 
 This patch is intentionally opt-in because it changes live trade behavior. Test
 with a non-production character or server first.
+
+## `apply-patches zone-density`
+
+Experimental patch set for random bot starter and early-zone density.
+
+This patch adds optional `AiPlayerbot.ZoneDensity.*` config keys. When enabled,
+random bot teleport destination selection skips configured starter or early
+leveling zones that already have enough random bots. This is intended to keep
+high global bot populations while preventing small low-level zones from feeling
+saturated.
+
+Apply and rebuild:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-patches zone-density --rebuild
+```
+
+Then enable the default starter/early-zone caps:
+
+```bash
+./scripts/playerbots-tuner.sh --server-dir ~/wow-server-playerbots apply-preset zone-density-starter --restart
+```
+
+Default caps:
+
+```ini
+AiPlayerbot.ZoneDensity.Enabled = 1
+AiPlayerbot.ZoneDensity.StarterZoneLimit = 20
+AiPlayerbot.ZoneDensity.EarlyZoneLimit = 45
+```
+
+The patch affects future random bot teleport destination choices. Existing bots
+may need time to teleport, randomize, refresh, or complete a restart/login cycle
+before density changes are visible.
